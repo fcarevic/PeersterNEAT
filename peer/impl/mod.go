@@ -41,6 +41,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.RumorsMessage{}, n.RumorMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.AckMessage{}, n.ackMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StatusMessage{}, n.statusMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.PrivateMessage{}, n.privateMessageCallback)
 
 	return &n
 }
@@ -89,9 +90,14 @@ func (n *node) Start() error {
 	}
 	n.isRunning = true
 
-	n.activeThreads.Add(2)
+	// Start threads
+	n.activeThreads.Add(1)
 	go mainLoop(n)
 
+	n.activeThreads.Add(1)
+	go n.heartbeat()
+
+	n.activeThreads.Add(1)
 	n.antiEntropyWait.Add(1)
 	go n.antiEntropy()
 	return nil

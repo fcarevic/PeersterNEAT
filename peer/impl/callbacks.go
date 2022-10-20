@@ -200,3 +200,25 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 	//	statusMsg)
 	return nil
 }
+
+func (n *node) privateMessageCallback(msg types.Message, pkt transport.Packet) error {
+	privateMsg, ok := msg.(*types.PrivateMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to Chat message got wrong type: %T", msg)
+	}
+
+	// Check if the node is a recipient and process the message
+	var _, exist = privateMsg.Recipients[n.conf.Socket.GetAddress()]
+	if exist {
+
+		pkt := msgToPacket(pkt.Header.Source, pkt.Header.RelayedBy, pkt.Header.Destination, *privateMsg.Msg)
+		err := n.conf.MessageRegistry.ProcessPacket(pkt)
+		if err != nil {
+			log.Error().Msgf("[%s]: PrivateMessageCallback: Failed in processing private message: %s", privateMsg)
+			return err
+		} else {
+			log.Info().Msgf("[%s]: PrivateMessageCallback: Processed private message: %s", privateMsg)
+		}
+	}
+	return nil
+}

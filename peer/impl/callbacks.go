@@ -5,6 +5,7 @@ import (
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 	"golang.org/x/xerrors"
+	"math/rand"
 )
 
 // Callback function for chat message
@@ -69,14 +70,14 @@ func (n *node) RumorMessageCallback(msg types.Message, pkt transport.Packet) err
 		}
 	}
 
-	// Log received message
-	log.Info().Msgf(
-		"[%s]: RUMOR CALLBACK, Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
-		n.conf.Socket.GetAddress(),
-		pkt.Header.Source,
-		pkt.Header.Destination,
-		pkt.Msg.Type,
-		rumorMsg)
+	//// Log received message
+	//log.Info().Msgf(
+	//	"[%s]: RUMOR CALLBACK, Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
+	//	n.conf.Socket.GetAddress(),
+	//	pkt.Header.Source,
+	//	pkt.Header.Destination,
+	//	pkt.Msg.Type,
+	//	rumorMsg)
 	return nil
 }
 
@@ -88,14 +89,38 @@ func (n *node) ackMessageCallback(msg types.Message, pkt transport.Packet) error
 		return xerrors.Errorf("Failed to cast to ack message got wrong type: %T", msg)
 	}
 
-	// Log received message
-	log.Info().Msgf(
-		"[%s]: ACK CALLBACK, Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
-		n.conf.Socket.GetAddress(),
-		pkt.Header.Source,
-		pkt.Header.Destination,
-		pkt.Msg.Type,
-		ackMsg)
+	//log.Info().Msgf(
+	//	"[%s]: ackMessageCallback: entered ",
+	//	n.conf.Socket.GetAddress(),
+	//)
+	// Extract status msg
+	statusMsg := ackMsg.Status
+
+	// Craft new packet
+	packet, err := n.msgTypesToPacket(pkt.Header.Source, pkt.Header.RelayedBy, pkt.Header.Destination, statusMsg)
+	if err != nil {
+		return err
+	}
+
+	// Process pkt
+	errProcess := n.conf.MessageRegistry.ProcessPacket(packet)
+	if errProcess != nil {
+		log.Info().Msgf(
+			"[%s]: ackMessageCallback: error processing packet of messageType: %s",
+			n.conf.Socket.GetAddress(),
+			packet.Msg.Type,
+		)
+		return errProcess
+	}
+
+	//// Log received message
+	//log.Info().Msgf(
+	//	"[%s]: ackMessageCallback: Successfully received: Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
+	//	n.conf.Socket.GetAddress(),
+	//	pkt.Header.Source,
+	//	pkt.Header.Destination,
+	//	pkt.Msg.Type,
+	//	ackMsg)
 	return nil
 }
 
@@ -107,8 +132,14 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 		return xerrors.Errorf("Failed to cast to status message got wrong type: %T", msg)
 	}
 
+	//log.Info().Msgf(
+	//	"[%s]: statusMessageCallback: entered ",
+	//	n.conf.Socket.GetAddress(),
+	//)
 	// Process the status message
 	missing, rumorsToSend := n.processStatus(*statusMsg)
+
+	log.Error().Msgf("[%s] %s, len %d , %s", n.conf.Socket.GetAddress(), missing, len(rumorsToSend), rumorsToSend)
 
 	// If I am missing rumors, send status message to origin
 	if missing {
@@ -122,7 +153,8 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 		if errConvert != nil {
 			return errConvert
 		}
-		err := n.sendPkt(myStatusPkt, TIMEOUT)
+		err := n.conf.Socket.Send(pkt.Header.Source, myStatusPkt, TIMEOUT)
+		log.Error().Msgf("[%s]: statusMessageCallback: Sending request to catch up to %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
 		if err != nil {
 			log.Error().Msgf("[%s]: statusMessageCallback: Sending status failed", n.conf.Socket.GetAddress())
 			return err
@@ -132,18 +164,39 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 	// Send missing rumors to peer
 	if len(rumorsToSend) != 0 {
 		err := n.sendRumors(rumorsToSend, false, "", pkt.Header.Source)
+		log.Info().Msgf("[%s]: statusMessageCallback: Sending extra rumors to %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
 		if err != nil {
 			log.Error().Msgf("[%s]: statusMessageCallback: Sending extra rumors failed", n.conf.Socket.GetAddress())
 			return err
 		}
 	}
-	// Log received message
-	log.Info().Msgf(
-		"[%s]: Status message callback:  Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
-		n.conf.Socket.GetAddress(),
-		pkt.Header.Source,
-		pkt.Header.Destination,
-		pkt.Msg.Type,
-		statusMsg)
+
+	// Continue mongering
+	if len(rumorsToSend) == 0 && !missing {
+		r := rand.Float64()
+		if r <= n.conf.ContinueMongering {
+
+			// Create a status msg
+			var statusMsg, _ = n.getStatusMaps()
+			// Send to random neigbour
+			err := n.sendToRandomNeighbour(statusMsg, []string{pkt.Header.RelayedBy})
+			if err != nil {
+				log.Info().Msgf("[%s]: statusMessageCallback: continue mongering: %s",
+					n.conf.Socket.GetAddress(),
+					err.Error(),
+				)
+			}
+		}
+
+	}
+
+	//// Log received message
+	//log.Info().Msgf(
+	//	"[%s]: Status message callback:  Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
+	//	n.conf.Socket.GetAddress(),
+	//	pkt.Header.Source,
+	//	pkt.Header.Destination,
+	//	pkt.Msg.Type,
+	//	statusMsg)
 	return nil
 }

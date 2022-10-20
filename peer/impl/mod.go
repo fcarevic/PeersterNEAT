@@ -28,9 +28,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		routingTable: make(map[string]string),
 		conf:         conf,
 		rumorInfo: RumorInfo{
-			sequenceCounter: 0,
-			peerSequences:   make(map[string]uint),
-			peerRumors:      make(map[string][]types.Rumor),
+			peerSequences: make(map[string]uint),
+			peerRumors:    make(map[string][]types.Rumor),
 		},
 	}
 
@@ -229,7 +228,9 @@ func (n *node) Broadcast(msg transport.Message) error {
 	// Create the rumor message
 	_, err2 := n.sendMessageAsRumor(msg)
 	if err2 != nil {
-		return err2
+		log.Error().Msgf("[%s]: Broadcast: %s",
+			n.conf.Socket.GetAddress(),
+			err2.Error())
 	}
 
 	// Process the rumor locally

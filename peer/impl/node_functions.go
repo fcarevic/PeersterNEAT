@@ -39,11 +39,20 @@ func mainLoop(n *node) {
 		var myAddress = n.conf.Socket.GetAddress()
 		// If message is for me, then process it else relay it
 		if pkt.Header.Destination == myAddress {
-			err := n.conf.MessageRegistry.ProcessPacket(pkt)
-			if err != nil {
-				log.Error().Msgf("%s:ERROR: while processsing a packet: %s", n.conf.Socket.GetAddress(), pkt.String())
-			}
 
+			n.activeThreads.Add(1)
+
+			go func() {
+				err := n.conf.MessageRegistry.ProcessPacket(pkt)
+				if err != nil {
+					log.Error().Msgf("[%s]: mainLoop :Error while processsing a packet: %s:\nError: %s",
+						n.conf.Socket.GetAddress(),
+						pkt.String(),
+						err.Error(),
+					)
+				}
+				n.activeThreads.Done()
+			}()
 		} else {
 			// relay the message
 			err := n.sendPkt(pkt, TIMEOUT)

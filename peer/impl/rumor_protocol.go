@@ -10,24 +10,30 @@ import (
 )
 
 type RumorInfo struct {
-	sequenceCounter uint
-	peerSequences   map[string]uint
-	peerRumors      map[string][]types.Rumor
+	peerSequences map[string]uint
+	peerRumors    map[string][]types.Rumor
 
 	// Semaphores
-	sequenceNumberMutex sync.Mutex
-	peerSequencesMutex  sync.Mutex
+	rumorInfoMutex sync.Mutex
 }
 
-func (rumorInfo *RumorInfo) getNextSequenceNumber() uint {
-
+func (rumorInfo *RumorInfo) registerNewRumor(rumor types.Rumor, origin string) types.Rumor {
 	// Acquire lock
-	rumorInfo.sequenceNumberMutex.Lock()
-	defer rumorInfo.sequenceNumberMutex.Unlock()
+	rumorInfo.rumorInfoMutex.Lock()
+	defer rumorInfo.rumorInfoMutex.Unlock()
 
-	// Return next sequence counter
-	rumorInfo.sequenceCounter = rumorInfo.sequenceCounter + 1
-	return rumorInfo.sequenceCounter
+	// Add sequence number to header
+	var sequenceCounter, ok = rumorInfo.peerSequences[origin]
+	if !ok {
+		sequenceCounter = 0
+	}
+	sequenceCounter = sequenceCounter + 1
+	rumor.Sequence = sequenceCounter
+
+	// Insert into map of all rumors
+	rumorInfo.peerRumors[origin] = append(rumorInfo.peerRumors[origin], rumor)
+	rumorInfo.peerSequences[origin] = sequenceCounter
+	return rumor
 }
 
 func (rumorInfo *RumorInfo) getSequenceNumber(peer string) uint {
@@ -43,35 +49,35 @@ func (rumorInfo *RumorInfo) getSequenceNumber(peer string) uint {
 	return numberOfSequences
 }
 
-func (rumorInfo *RumorInfo) insertNewRumor(
+func (rumorInfo *RumorInfo) insertPeerRumor(
 	peer string,
 	rumor types.Rumor,
-) error {
+) {
 
 	// Increment number of sequence for peer
 	var numberOfSequences, ok = rumorInfo.peerSequences[peer]
 	if !ok {
-		return xerrors.Errorf("incrementSequenceNumber : Peer does not exist")
+		numberOfSequences = 0
 	}
 	rumorInfo.peerSequences[peer] = numberOfSequences + 1
 	rumorInfo.peerRumors[peer] = append(rumorInfo.peerRumors[peer], rumor)
-	return nil
+	return
 }
 
 // Returns the map of peer-> sequence NUM (including the self node), and the map of peer->[]Rumors
 func (n *node) getStatusMaps() (types.StatusMessage, map[string][]types.Rumor) {
 
 	// Acquire lock
-	n.rumorInfo.sequenceNumberMutex.Lock()
-	defer n.rumorInfo.sequenceNumberMutex.Unlock()
+	n.rumorInfo.rumorInfoMutex.Lock()
+	defer n.rumorInfo.rumorInfoMutex.Unlock()
 
 	// Copy peer map
 	var statusMap, rumorMap = copyStatusRumorMaps(n.rumorInfo.peerSequences, n.rumorInfo.peerRumors)
 
-	// Add info for current node if sequence num > 0
-	if n.rumorInfo.sequenceCounter > 0 {
-		statusMap[n.conf.Socket.GetAddress()] = n.rumorInfo.sequenceCounter
-	}
+	//// Add info for current node if sequence num > 0
+	//if n.rumorInfo.sequenceCounter > 0 {
+	//	statusMap[n.conf.Socket.GetAddress()] = n.rumorInfo.sequenceCounter
+	//}
 
 	return statusMap, rumorMap
 }
@@ -90,6 +96,7 @@ func (n *node) processStatus(statusMsg types.StatusMessage) (bool, []types.Rumor
 		var remoteNum, ok = statusMsg[myPeer]
 		if !ok {
 			toSend = append(toSend, myRumorMap[myPeer]...)
+			continue
 		}
 
 		if remoteNum == myNum {
@@ -107,7 +114,7 @@ func (n *node) processStatus(statusMsg types.StatusMessage) (bool, []types.Rumor
 	}
 
 	// What am I missing
-	for remotePeer := range myStatusMap {
+	for remotePeer := range statusMsg {
 		var _, ok = myStatusMap[remotePeer]
 		if !ok {
 			missing = true
@@ -119,8 +126,8 @@ func (n *node) processStatus(statusMsg types.StatusMessage) (bool, []types.Rumor
 func (rumorInfo *RumorInfo) filterExpectedRumors(rumors []types.Rumor) ([]types.Rumor, map[string]uint) {
 
 	// Acquire lock
-	rumorInfo.sequenceNumberMutex.Lock()
-	defer rumorInfo.sequenceNumberMutex.Unlock()
+	rumorInfo.rumorInfoMutex.Lock()
+	defer rumorInfo.rumorInfoMutex.Unlock()
 
 	var validRumors []types.Rumor
 	for _, rumor := range rumors {
@@ -128,10 +135,7 @@ func (rumorInfo *RumorInfo) filterExpectedRumors(rumors []types.Rumor) ([]types.
 		lastSequenceNumber := rumorInfo.getSequenceNumber(rumor.Origin)
 		if rumor.Sequence == lastSequenceNumber+1 {
 			validRumors = append(validRumors, rumor)
-			err := rumorInfo.insertNewRumor(rumor.Origin, rumor)
-			if err != nil {
-				log.Error().Msgf("SHOULD NEVER BE HERE")
-			}
+			rumorInfo.insertPeerRumor(rumor.Origin, rumor)
 		}
 	}
 
@@ -180,9 +184,12 @@ func (n *node) sendMessageAsRumor(msg transport.Message) (transport.Packet, erro
 	// Craft a rumor msg
 	var rumorObject = types.Rumor{
 		Msg:      &msg,
-		Sequence: n.rumorInfo.getNextSequenceNumber(),
+		Sequence: 0,
 		Origin:   n.conf.Socket.GetAddress(),
 	}
+
+	// Register rumor to the map and update sequence number.
+	rumorObject = n.rumorInfo.registerNewRumor(rumorObject, n.conf.Socket.GetAddress())
 	var rumorMessage = types.RumorsMessage{
 		Rumors: []types.Rumor{rumorObject}}
 
@@ -194,13 +201,13 @@ func (n *node) sendMessageAsRumor(msg transport.Message) (transport.Packet, erro
 	// Craft a packet
 	packet, err := n.msgTypesToPacket(srcAddress, srcAddress, neighbour, rumorMessage)
 	if err != nil {
-		log.Error().Msgf("%s: sendRumorMessage: Marshalling failed", n.conf.Socket.GetAddress())
+		log.Error().Msgf("[%s]: sendRumorMessage: Marshalling failed", n.conf.Socket.GetAddress())
 		return transport.Packet{}, err
 	}
 	// Send the packet
 	errSend := n.sendPkt(packet, TIMEOUT)
 	if errSend != nil {
-		log.Error().Msgf("%s: sendRumorMessage: Sending message failed", n.conf.Socket.GetAddress())
+		log.Error().Msgf("[%s]: sendRumorMessage: Sending message failed", n.conf.Socket.GetAddress())
 		return transport.Packet{}, errSend
 	}
 	return packet, nil
@@ -220,18 +227,18 @@ func (n *node) sendAckForRumorPacket(pkt transport.Packet, statusMap map[string]
 	// Craft packet
 	ackPacket, err := n.msgTypesToPacket(myAddress, myAddress, receivedFrom, ackMessage)
 	if err != nil {
-		log.Error().Msgf("%s: sendAckForRumorPacket: Marshalling failed", n.conf.Socket.GetAddress())
+		log.Error().Msgf("[%s]: sendAckForRumorPacket: Marshalling failed", n.conf.Socket.GetAddress())
 		return err
 	}
 
 	// Send packet
 	errSend := n.conf.Socket.Send(receivedFrom, ackPacket, TIMEOUT)
 	if errSend != nil {
-		log.Error().Msgf("%s: sendAckForRumorPacket: Sending failed: %s", n.conf.Socket.GetAddress(),
+		log.Error().Msgf("[%s]: sendAckForRumorPacket: Sending failed: %s", n.conf.Socket.GetAddress(),
 			errSend.Error())
 		return errSend
 	}
-	log.Info().Msgf("%s: sendAckForRumorPacket: Sent ACK", n.conf.Socket.GetAddress())
+	log.Info().Msgf("[%s]: sendAckForRumorPacket: Sent ACK to %s", n.conf.Socket.GetAddress(), receivedFrom)
 	return nil
 }
 
@@ -267,9 +274,8 @@ func (n *node) sendRumors(rumors []types.Rumor, relay bool, receivedFrom string,
 	var dstAddress = sendTo
 	if relay {
 		neighbour, err := n.getRangomNeighbour([]string{receivedFrom})
-		log.Info().Msgf("dst rumor relay : %s", dstAddress)
 		if err != nil {
-			log.Info().Msgf("%s: sendRumors via relay: %s", n.conf.Socket.GetAddress(), err.Error())
+			log.Info().Msgf("[%s]: sendRumors via relay: %s", n.conf.Socket.GetAddress(), err.Error())
 			return nil
 		}
 		dstAddress = neighbour
@@ -290,15 +296,16 @@ func (n *node) sendRumors(rumors []types.Rumor, relay bool, receivedFrom string,
 	if relay {
 		errSend := n.sendPkt(packet, TIMEOUT)
 		if errSend != nil {
-			log.Error().Msgf("%s: sendRumors via relay: %s", n.conf.Socket.GetAddress(), errSend.Error())
+			log.Error().Msgf("[%s]: sendRumors via relay: %s", n.conf.Socket.GetAddress(), errSend.Error())
 			return errSend
 		}
 	} else {
 		// Send packet
 		// we do not use routing table if not relay
-		errSend := n.conf.Socket.Send(receivedFrom, packet, TIMEOUT)
+		errSend := n.conf.Socket.Send(dstAddress, packet, TIMEOUT)
+		//log.Info().Msgf("[%s] trying to send to %s pkt: %s", n.conf.Socket.GetAddress(), dstAddress, packet)
 		if errSend != nil {
-			log.Error().Msgf("%s: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
+			log.Error().Msgf("[%s]: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
 				errSend.Error())
 			return errSend
 		}

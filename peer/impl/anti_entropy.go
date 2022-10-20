@@ -33,10 +33,11 @@ func (n *node) antiEntropy() {
 		var statusMsg, _ = n.getStatusMaps()
 
 		// Send to neighbour
-		err := n.sendToRandomNeighbour(statusMsg)
+		err := n.sendToRandomNeighbour(statusMsg, []string{})
 		if err != nil {
 			log.Error().Msgf("[%s]: AntiEntropy: Sending failed", n.conf.Socket.GetAddress())
 		}
+		//log.Info().Msgf("[%s]: AntiEntropy: Sent successfully", n.conf.Socket.GetAddress())
 
 		// Sleep
 		time.Sleep(n.conf.AntiEntropyInterval)
@@ -47,10 +48,10 @@ func (n *node) antiEntropy() {
 	n.activeThreads.Done()
 }
 
-func (n *node) sendToRandomNeighbour(msg types.Message) error {
+func (n *node) sendToRandomNeighbour(msg types.Message, excludePeers []string) error {
 
 	// Get random neighbour
-	neighbour, err := n.getRangomNeighbour([]string{})
+	neighbour, err := n.getRangomNeighbour(excludePeers)
 	if err != nil {
 		return err
 	}
@@ -70,6 +71,6 @@ func (n *node) sendToRandomNeighbour(msg types.Message) error {
 		log.Error().Msgf("[%s]: sendToRandomNeighbour: Sending message failed", n.conf.Socket.GetAddress())
 		return errSend
 	}
-	log.Info().Msgf("[%s]: sendToRandomNeighbour: Status message sent to %s", n.conf.Socket.GetAddress(), neighbour)
+	//log.Info().Msgf("[%s]: sendToRandomNeighbour: Status message sent to %s", n.conf.Socket.GetAddress(), neighbour)
 	return nil
 }

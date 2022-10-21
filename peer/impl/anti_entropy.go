@@ -16,7 +16,7 @@ func (n *node) antiEntropy() {
 
 	// Wait for first peer to be added
 	n.antiEntropyWait.Wait()
-	log.Error().Msgf("[%s]: AntiEntropy started", n.conf.Socket.GetAddress())
+	log.Info().Msgf("[%s]: AntiEntropy started", n.conf.Socket.GetAddress())
 
 	// AE loop
 	for {
@@ -60,10 +60,10 @@ func (n *node) sendToRandomNeighbour(msg types.Message, excludePeers []string) e
 	srcAddress := n.conf.Socket.GetAddress()
 
 	// Craft a packet
-	packet, err := n.msgTypesToPacket(srcAddress, srcAddress, neighbour, msg)
-	if err != nil {
+	packet, errCast := n.msgTypesToPacket(srcAddress, srcAddress, neighbour, msg)
+	if errCast != nil {
 		log.Error().Msgf("[%s]: sendToRandomNeighbour: Marshalling failed", n.conf.Socket.GetAddress())
-		return err
+		return errCast
 	}
 	// Send the packet
 	errSend := n.sendPkt(packet, TIMEOUT)
@@ -71,6 +71,6 @@ func (n *node) sendToRandomNeighbour(msg types.Message, excludePeers []string) e
 		log.Error().Msgf("[%s]: sendToRandomNeighbour: Sending message failed", n.conf.Socket.GetAddress())
 		return errSend
 	}
-	//log.Info().Msgf("[%s]: sendToRandomNeighbour: Status message sent to %s", n.conf.Socket.GetAddress(), neighbour)
+	log.Info().Msgf("[%s]: sendToRandomNeighbour: Status message sent to %s", n.conf.Socket.GetAddress(), neighbour)
 	return nil
 }

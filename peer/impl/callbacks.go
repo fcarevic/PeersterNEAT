@@ -93,24 +93,37 @@ func (n *node) ackMessageCallback(msg types.Message, pkt transport.Packet) error
 	//	"[%s]: ackMessageCallback: entered ",
 	//	n.conf.Socket.GetAddress(),
 	//)
-	// Extract status msg
-	statusMsg := ackMsg.Status
 
-	// Craft new packet
-	packet, err := n.msgTypesToPacket(pkt.Header.Source, pkt.Header.RelayedBy, pkt.Header.Destination, statusMsg)
-	if err != nil {
-		return err
-	}
+	if !(n.rumorInfo.processAck(pkt, *ackMsg)) {
 
-	// Process pkt
-	errProcess := n.conf.MessageRegistry.ProcessPacket(packet)
-	if errProcess != nil {
-		log.Info().Msgf(
-			"[%s]: ackMessageCallback: error processing packet of messageType: %s",
-			n.conf.Socket.GetAddress(),
-			packet.Msg.Type,
+		// If the ack is not expected by the Rumoring, then it is the part of the continual mongering
+		// Extract status msg
+		statusMsg := ackMsg.Status
+
+		// Craft new packet
+		statusPacket, errS := n.msgTypesToPacket(
+			pkt.Header.Source,
+			pkt.Header.RelayedBy,
+			pkt.Header.Destination,
+			statusMsg,
 		)
-		return errProcess
+		if errS != nil {
+			log.Info().Msgf(
+				"[%s]: rumorThread: error processing packet of messageType: %s",
+				n.conf.Socket.GetAddress(),
+				pkt.Msg.Type,
+			)
+		}
+
+		// Process pkt
+		errProcess := n.conf.MessageRegistry.ProcessPacket(statusPacket)
+		if errProcess != nil {
+			log.Info().Msgf(
+				"[%s]: ackMessageCallback: error processing packet of messageType: %s",
+				n.conf.Socket.GetAddress(),
+				statusPacket.Msg.Type,
+			)
+		}
 	}
 
 	//// Log received message

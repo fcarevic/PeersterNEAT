@@ -30,6 +30,10 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		rumorInfo: RumorInfo{
 			peerSequences: make(map[string]uint),
 			peerRumors:    make(map[string][]types.Rumor),
+			pktToChannelMap: make(map[string]chan struct {
+				transport.Packet
+				types.AckMessage
+			}),
 		},
 	}
 
@@ -172,6 +176,7 @@ func (n *node) AddPeer(addr ...string) {
 		}
 		n.SetRoutingEntry(address, address)
 
+		// Start the antiEntropy if not running
 		n.startStopMutex.Lock()
 		if !(n.antiEntropyRunning) {
 			n.antiEntropyRunning = true
@@ -232,7 +237,7 @@ func (n *node) SetRoutingEntry(origin, relayAddr string) {
 func (n *node) Broadcast(msg transport.Message) error {
 
 	// Create the rumor message
-	_, err2 := n.sendMessageAsRumor(msg)
+	err2 := n.sendMessageAsRumor(msg)
 	if err2 != nil {
 		log.Error().Msgf("[%s]: Broadcast: %s",
 			n.conf.Socket.GetAddress(),

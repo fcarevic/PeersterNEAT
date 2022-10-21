@@ -107,6 +107,13 @@ func (n *node) Start() error {
 	return nil
 }
 
+func (n *node) getRunning() bool {
+	n.startStopMutex.Lock()
+	flag := n.isRunning
+	n.startStopMutex.Unlock()
+	return flag
+}
+
 // Stop implements peer.Service
 func (n *node) Stop() error {
 	// Safety checks
@@ -129,7 +136,6 @@ func (n *node) Stop() error {
 	} else {
 		// if not running implies waiting for peer to be added to routing table
 		// Awake it
-		// TODO: THIS CANNOT BE DONE, AFTER WAIT DO I CHECK CONDITION AGAIN?
 		n.antiEntropyWait.Done()
 	}
 	n.startStopMutex.Unlock()
@@ -237,7 +243,7 @@ func (n *node) SetRoutingEntry(origin, relayAddr string) {
 func (n *node) Broadcast(msg transport.Message) error {
 
 	// Create the rumor message
-	err2 := n.sendMessageAsRumor(msg)
+	err2 := n.sendMessageAsRumor(msg, []string{})
 	if err2 != nil {
 		log.Error().Msgf("[%s]: Broadcast: %s",
 			n.conf.Socket.GetAddress(),

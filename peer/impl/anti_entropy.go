@@ -20,12 +20,7 @@ func (n *node) antiEntropy() {
 
 	// AE loop
 	for {
-
-		// Check whether to stop the thread
-		n.startStopMutex.Lock()
-		stop := !n.isRunning
-		n.startStopMutex.Unlock()
-		if stop {
+		if !n.getRunning() {
 			break
 		}
 

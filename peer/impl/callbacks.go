@@ -41,7 +41,6 @@ func (n *node) RumorMessageCallback(msg types.Message, pkt transport.Packet) err
 	}
 
 	// Update routing table
-	// TODO: DO WE CREATE A NEW RUMOR MESSAGE, OR RELAY THE PACKET?
 	n.updateRoutingTableWithRumors(expectedRumors, pkt.Header.RelayedBy)
 
 	// Send ACK
@@ -52,9 +51,14 @@ func (n *node) RumorMessageCallback(msg types.Message, pkt transport.Packet) err
 	}
 
 	// Send to another neighbours
-	errRelay := n.sendRumors(expectedRumors, true, pkt.Header.RelayedBy, "")
+	errRelay := n.startRumoring(pkt.Copy(), []string{pkt.Header.RelayedBy})
 	if errRelay != nil {
-		return errRelay
+		log.Error().Msgf(
+			"[%s]: RumorMessageCallback: error: %s ",
+			n.conf.Socket.GetAddress(),
+			errRelay.Error(),
+		)
+
 	}
 
 	// Process embedded msgs
@@ -70,14 +74,6 @@ func (n *node) RumorMessageCallback(msg types.Message, pkt transport.Packet) err
 		}
 	}
 
-	//// Log received message
-	//log.Info().Msgf(
-	//	"[%s]: RUMOR CALLBACK, Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
-	//	n.conf.Socket.GetAddress(),
-	//	pkt.Header.Source,
-	//	pkt.Header.Destination,
-	//	pkt.Msg.Type,
-	//	rumorMsg)
 	return nil
 }
 
@@ -126,14 +122,6 @@ func (n *node) ackMessageCallback(msg types.Message, pkt transport.Packet) error
 		}
 	}
 
-	//// Log received message
-	//log.Info().Msgf(
-	//	"[%s]: ackMessageCallback: Successfully received: Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
-	//	n.conf.Socket.GetAddress(),
-	//	pkt.Header.Source,
-	//	pkt.Header.Destination,
-	//	pkt.Msg.Type,
-	//	ackMsg)
 	return nil
 }
 
@@ -145,10 +133,6 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 		return xerrors.Errorf("Failed to cast to status message got wrong type: %T", msg)
 	}
 
-	//log.Info().Msgf(
-	//	"[%s]: statusMessageCallback: entered ",
-	//	n.conf.Socket.GetAddress(),
-	//)
 	// Process the status message
 	missing, rumorsToSend := n.processStatus(*statusMsg)
 
@@ -167,19 +151,30 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 			return errConvert
 		}
 		err := n.conf.Socket.Send(pkt.Header.Source, myStatusPkt, TIMEOUT)
-		log.Error().Msgf("[%s]: statusMessageCallback: Sending request to catch up to %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
+		log.Error().Msgf(
+			"[%s]: statusMessageCallback: Sending request to catch up to %s",
+			n.conf.Socket.GetAddress(),
+			pkt.Header.Source)
 		if err != nil {
-			log.Error().Msgf("[%s]: statusMessageCallback: Sending status failed", n.conf.Socket.GetAddress())
+			log.Error().Msgf(
+				"[%s]: statusMessageCallback: Sending status failed",
+				n.conf.Socket.GetAddress(),
+			)
 			return err
 		}
 	}
 
 	// Send missing rumors to peer
 	if len(rumorsToSend) != 0 {
-		err := n.sendRumors(rumorsToSend, false, "", pkt.Header.Source)
-		log.Info().Msgf("[%s]: statusMessageCallback: Sending extra rumors to %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
+		err := n.sendCatchUpRumors(rumorsToSend, pkt.Header.Source)
+		log.Info().Msgf(
+			"[%s]: statusMessageCallback: Sending extra rumors to %s",
+			n.conf.Socket.GetAddress(),
+			pkt.Header.Source)
 		if err != nil {
-			log.Error().Msgf("[%s]: statusMessageCallback: Sending extra rumors failed", n.conf.Socket.GetAddress())
+			log.Error().Msgf(
+				"[%s]: statusMessageCallback: Sending extra rumors failed",
+				n.conf.Socket.GetAddress())
 			return err
 		}
 	}
@@ -203,14 +198,6 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 
 	}
 
-	//// Log received message
-	//log.Info().Msgf(
-	//	"[%s]: Status message callback:  Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
-	//	n.conf.Socket.GetAddress(),
-	//	pkt.Header.Source,
-	//	pkt.Header.Destination,
-	//	pkt.Msg.Type,
-	//	statusMsg)
 	return nil
 }
 
@@ -229,9 +216,9 @@ func (n *node) privateMessageCallback(msg types.Message, pkt transport.Packet) e
 		if err != nil {
 			log.Error().Msgf("[%s]: PrivateMessageCallback: Failed in processing private message: %s", privateMsg)
 			return err
-		} else {
-			log.Info().Msgf("[%s]: PrivateMessageCallback: Processed private message: %s", privateMsg)
 		}
+		log.Info().Msgf("[%s]: PrivateMessageCallback: Processed private message: %s", privateMsg)
+
 	}
 	return nil
 }

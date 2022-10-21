@@ -16,14 +16,10 @@ func mainLoop(n *node) {
 	log.Info().Msgf("Starting node on: %s", n.conf.Socket.GetAddress())
 	// While the isRunning flag is set, do the main loop
 	for {
-
 		// Check stop condition
-		n.startStopMutex.Lock()
-		if !n.isRunning {
-			n.startStopMutex.Unlock()
+		if !n.getRunning() {
 			break
 		}
-		n.startStopMutex.Unlock()
 
 		// Receive packet
 		pkt, err := n.conf.Socket.Recv(TIMEOUT)
@@ -93,13 +89,4 @@ func (n *node) sendPkt(pkt transport.Packet, timeout time.Duration) error {
 	pkt = pkt.Copy()
 	pkt.Header.RelayedBy = n.conf.Socket.GetAddress()
 	return n.conf.Socket.Send(nextHop, pkt, timeout)
-}
-
-// Relay packet
-func (n *node) relayPkt(pkt transport.Packet, timeout time.Duration) error {
-	err := n.sendPkt(pkt, TIMEOUT)
-	if err != nil {
-		return err
-	}
-	return nil
 }

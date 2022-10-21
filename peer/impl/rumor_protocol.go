@@ -45,9 +45,9 @@ func (rumorInfo *RumorInfo) registerNewRumor(rumor types.Rumor, origin string) t
 func (rumorInfo *RumorInfo) registerRumorMessageForAck(
 	pkt transport.Packet,
 	channel chan struct {
-		transport.Packet
-		types.AckMessage
-	}) {
+	transport.Packet
+	types.AckMessage
+}) {
 
 	// Acquire lock
 	rumorInfo.pktToChannelMutex.Lock()
@@ -112,7 +112,6 @@ func (rumorInfo *RumorInfo) insertPeerRumor(
 	}
 	rumorInfo.peerSequences[peer] = numberOfSequences + 1
 	rumorInfo.peerRumors[peer] = append(rumorInfo.peerRumors[peer], rumor)
-	return
 }
 
 // Returns the map of peer-> sequence NUM (including the self node), and the map of peer->[]Rumors
@@ -222,7 +221,7 @@ func (n *node) getRangomNeighbour(notIncluded []string) (string, error) {
 }
 
 // Sends rumor message for a given node
-func (n *node) sendMessageAsRumor(msg transport.Message) error {
+func (n *node) sendMessageAsRumor(msg transport.Message, excludeNeighbours []string) error {
 
 	// Craft a rumor msg
 	var rumorObject = types.Rumor{
@@ -236,161 +235,16 @@ func (n *node) sendMessageAsRumor(msg transport.Message) error {
 	var rumorMessage = types.RumorsMessage{
 		Rumors: []types.Rumor{rumorObject}}
 
-	// Start rumoring service
-	return n.startRumoring(rumorMessage)
-}
-
-func (n *node) startRumoring(rumorMessage types.RumorsMessage) error {
-
 	// Get node's address
 	srcAddress := n.conf.Socket.GetAddress()
 
-	// Get random neighbour
-	neighbour, err := n.getRangomNeighbour([]string{})
-	if err != nil {
-		return err
-	}
-
 	// Craft a packet
-	var packet, errCast = n.msgTypesToPacket(srcAddress, srcAddress, neighbour, rumorMessage)
+	var packet, errCast = n.msgTypesToPacket(srcAddress, srcAddress, "dummy", rumorMessage)
 	if errCast != nil {
 		log.Error().Msgf("[%s]: sendRumorMessage: Marshalling failed", n.conf.Socket.GetAddress())
 	}
-
-	// Create channel for ack
-	channel := make(chan struct {
-		transport.Packet
-		types.AckMessage
-	})
-
-	// Init list for neighbour exclusion
-	var excludeNeighbours []string
-
-	// Init a timer
-	var timer *time.Ticker = nil
-	if n.conf.AckTimeout > 0 {
-		timer = time.NewTicker(n.conf.AckTimeout)
-	}
-
-	// Register new thread
-	n.activeThreads.Add(1)
-
-	go func() {
-
-		// notify the end
-		defer func() {
-			if timer != nil {
-				timer.Stop()
-			}
-			log.Info().Msgf("[%s]: RumorThread: stopped",
-				n.conf.Socket.GetAddress(),
-			)
-			n.activeThreads.Done()
-			close(channel)
-		}()
-
-		// Add pktID and channel to a map only if timeout is set
-		if n.conf.AckTimeout > 0 {
-			n.rumorInfo.registerRumorMessageForAck(packet, channel)
-		}
-
-		// Send the packet
-		errSend := n.sendPkt(packet, TIMEOUT)
-		if errSend != nil {
-			log.Error().Msgf("[%s]: sendRumorMessage: Sending message failed", n.conf.Socket.GetAddress())
-		}
-
-		log.Info().Msgf("[%s]: sendRumorMessage: Rumor thread started", n.conf.Socket.GetAddress())
-
-		if n.conf.AckTimeout > 0 {
-			for {
-
-				// Check whether to stop the thread
-				n.startStopMutex.Lock()
-				stop := !n.isRunning
-				n.startStopMutex.Unlock()
-				if stop {
-					return
-				}
-
-				select {
-				case pair := <-channel:
-					var arrivedPkt, ackMsg = pair.Packet, pair.AckMessage
-					log.Info().Msgf("[%s]: RumorThread: received from: %s",
-						n.conf.Socket.GetAddress(),
-						arrivedPkt.Header.Source)
-					if ackMsg.AckedPacketID == packet.Header.PacketID {
-						// Ack successfully received
-						log.Info().Msgf("[%s]: RumorThread: ACK successfully received from: %s",
-							n.conf.Socket.GetAddress(),
-							arrivedPkt.Header.Source)
-						// Extract status msg and process it
-						// Extract status msg
-						statusMsg := ackMsg.Status
-
-						// Craft new packet
-						statusPacket, errS := n.msgTypesToPacket(
-							arrivedPkt.Header.Source,
-							arrivedPkt.Header.RelayedBy,
-							arrivedPkt.Header.Destination,
-							statusMsg,
-						)
-						if errS != nil {
-							log.Info().Msgf(
-								"[%s]: rumorThread: error processing packet of messageType: %s",
-								n.conf.Socket.GetAddress(),
-								arrivedPkt.Msg.Type,
-							)
-						}
-
-						// Process pkt
-						errProcess := n.conf.MessageRegistry.ProcessPacket(statusPacket)
-						if errProcess != nil {
-							log.Info().Msgf(
-								"[%s]: ackMessageCallback: error processing packet of messageType: %s",
-								n.conf.Socket.GetAddress(),
-								statusPacket.Msg.Type,
-							)
-						}
-						return
-					}
-				case <-timer.C:
-					// Unregister this packet
-					n.rumorInfo.unregisterRumorMessageForAck(packet)
-
-					// Add this neighbour to list of excluded ones
-					excludeNeighbours = append(excludeNeighbours, packet.Header.Destination)
-
-					// Create a new one
-					var newNeighbour, errN = n.getRangomNeighbour(excludeNeighbours)
-
-					log.Error().Msgf("[%s]: sendRumorMessage: Marshalling failed", n.conf.Socket.GetAddress())
-
-					if errN != nil {
-						// If there are no more neighbours, return
-						return
-					}
-
-					// Craft a packet
-					var newPacket, errCastN = n.msgTypesToPacket(srcAddress, srcAddress, newNeighbour, rumorMessage)
-					if errCastN != nil {
-						log.Error().Msgf("[%s]: sendRumorMessage: Marshalling failed", n.conf.Socket.GetAddress())
-					}
-					packet = newPacket
-					// Add pktID and channel to a map
-					n.rumorInfo.registerRumorMessageForAck(packet, channel)
-
-					// Send the packet
-					errSendN := n.sendPkt(packet, TIMEOUT)
-					if errSendN != nil {
-						log.Error().Msgf("[%s]: sendRumorMessage: Sending message failed", n.conf.Socket.GetAddress())
-					}
-				}
-			}
-		}
-
-	}()
-	return nil
+	// Start rumoring service
+	return n.startRumoring(packet, excludeNeighbours)
 }
 
 func (n *node) sendAckForRumorPacket(pkt transport.Packet, statusMap map[string]uint) error {
@@ -442,53 +296,158 @@ func (n *node) updateRoutingTableWithRumors(rumors []types.Rumor, relay string) 
 	}
 }
 
-// Send rumors as:
-//  1. relay (relay=true, receivedFrom !=”)
-//  2. catch-up (relay=true, sendTo!=”)
-func (n *node) sendRumors(rumors []types.Rumor, relay bool, receivedFrom string, sendTo string) error {
+// Send rumors as catch-up
+func (n *node) sendCatchUpRumors(rumors []types.Rumor, sendTo string) error {
+
+	// Sort the array
+	rumors = sortRumors(rumors)
 
 	// Get addresses
 	srcAddress := n.conf.Socket.GetAddress()
-
-	// If we want to send rumors as 'catch-up', then the relay is false
-	var dstAddress = sendTo
-	if relay {
-		neighbour, err := n.getRangomNeighbour([]string{receivedFrom})
-		if err != nil {
-			log.Info().Msgf("[%s]: sendRumors via relay: %s", n.conf.Socket.GetAddress(), err.Error())
-			return nil
-		}
-		dstAddress = neighbour
-	}
 
 	// Craft message
 	var rumorMessage = types.RumorsMessage{
 		Rumors: rumors,
 	}
 	// Convert to packet
-	packet, errCast := n.msgTypesToPacket(srcAddress, srcAddress, dstAddress, rumorMessage)
+	packet, errCast := n.msgTypesToPacket(srcAddress, srcAddress, sendTo, rumorMessage)
 	if errCast != nil {
 		log.Error().Msgf("%s: sendRumors: %s", n.conf.Socket.GetAddress(), errCast.Error())
 		return errCast
 	}
 
-	// Send packet
-	if relay {
-		errStartRumor := n.startRumoring(rumorMessage)
-		if errStartRumor != nil {
-			log.Error().Msgf("%s: sendRumors: Failed to start rumoring: %s", n.conf.Socket.GetAddress(), errStartRumor.Error())
-			return errStartRumor
-		}
-	} else {
-		// Send packet
-		// we do not use routing table if not relay
-		errSend := n.conf.Socket.Send(dstAddress, packet, TIMEOUT)
-		//log.Info().Msgf("[%s] trying to send to %s pkt: %s", n.conf.Socket.GetAddress(), dstAddress, packet)
-		if errSend != nil {
-			log.Error().Msgf("[%s]: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
-				errSend.Error())
-			return errSend
-		}
+	// Send packet. We do not use routing table for catch-up
+	errSend := n.conf.Socket.Send(sendTo, packet, TIMEOUT)
+	if errSend != nil {
+		log.Error().Msgf("[%s]: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
+			errSend.Error())
+		return errSend
 	}
 	return nil
+}
+
+func (n *node) changePacketHeaderForRumoring(
+	packet transport.Packet,
+	exclNeighbors []string) (transport.Packet, error) {
+	// Change pkt header
+	var newNeighbour, errN = n.getRangomNeighbour(exclNeighbors)
+	if errN != nil {
+		// If there are no more neighbours, return
+		log.Error().Msgf(
+			"[%s]:startPacketRumoring: Aborting %s",
+			n.conf.Socket.GetAddress(),
+			errN.Error())
+		return transport.Packet{}, errN
+	}
+
+	// Change the packet header to change the packet ID
+	var newPacketHeader = transport.NewHeader(
+		packet.Header.Source,
+		n.conf.Socket.GetAddress(),
+		newNeighbour,
+		packet.Header.TTL,
+	)
+	packet.Header = &newPacketHeader
+
+	return packet, nil
+
+}
+
+func (n *node) processMsgByDummyPkt(msg types.Message, src string, relayedBy string, dst string) error {
+	statusPacket, errS := n.msgTypesToPacket(
+		src,
+		relayedBy,
+		dst,
+		msg,
+	)
+	if errS != nil {
+		return errS
+	}
+	// Process pkt
+	return n.conf.MessageRegistry.ProcessPacket(statusPacket)
+}
+
+func (n *node) startRumoring(
+	packet transport.Packet,
+	exclNeighbors []string,
+) error {
+
+	// No timeout, just send the packet
+	if n.conf.AckTimeout <= 0 {
+		log.Info().Msgf("[%s]: Sending w/0 ack", n.conf.Socket.GetAddress())
+		_, _ = n.sendPktToRandomNeighbour(packet, exclNeighbors, false, nil)
+		return nil
+	}
+	// Init
+	channel := make(chan struct {
+		transport.Packet
+		types.AckMessage
+	})
+	var timer = time.NewTicker(n.conf.AckTimeout)
+	n.activeThreads.Add(1)
+
+	go func() {
+		// notify the end
+		defer func() {
+			timer.Stop()
+			n.activeThreads.Done()
+			close(channel)
+			log.Info().Msgf("[%s]: RumorThread: stopped", n.conf.Socket.GetAddress())
+		}()
+		for n.getRunning() {
+			log.Info().Msgf("[%s]: RumorThread: started", n.conf.Socket.GetAddress())
+			log.Info().Msgf("[%s]: Sending w ack", n.conf.Socket.GetAddress())
+			pkt, err := n.sendPktToRandomNeighbour(packet, exclNeighbors, true, channel)
+			if err != nil {
+				return
+			}
+			packet = pkt
+
+			select {
+			case pair := <-channel:
+				var arrivedPkt, ackMsg = pair.Packet, pair.AckMessage
+				if ackMsg.AckedPacketID == packet.Header.PacketID {
+					log.Info().Msgf("[%s]: Recv ack from %s", n.conf.Socket.GetAddress(), arrivedPkt.Header.Source)
+					// Extract status msg and process it
+					statusMsg := ackMsg.Status
+					_ = n.processMsgByDummyPkt(
+						statusMsg, arrivedPkt.Header.Source, arrivedPkt.Header.RelayedBy, arrivedPkt.Header.Destination)
+					return
+				}
+			case <-timer.C:
+				// Unregister this packet
+				n.rumorInfo.unregisterRumorMessageForAck(packet)
+				// Add this neighbour to list of excluded ones
+				exclNeighbors = append(exclNeighbors, packet.Header.Destination)
+			}
+		}
+	}()
+	return nil
+}
+
+func (n *node) sendPktToRandomNeighbour(pkt transport.Packet, excludePeers []string,
+	needAck bool, channel chan struct {
+	transport.Packet
+	types.AckMessage
+}) (transport.Packet, error) {
+	// Get random neighbour
+	packet, err := n.changePacketHeaderForRumoring(pkt, excludePeers)
+	if err != nil {
+		return pkt, err
+	}
+
+	// Add pktID and channel to a map if needed ack
+	if needAck {
+		n.rumorInfo.registerRumorMessageForAck(packet, channel)
+	}
+	// Send the packet
+	errSend := n.sendPkt(packet, TIMEOUT)
+	if errSend != nil {
+		if needAck {
+			n.rumorInfo.unregisterRumorMessageForAck(packet)
+		}
+		log.Error().Msgf("[%s]: sendToRandomNeighbour: Sending message failed", n.conf.Socket.GetAddress())
+		return packet, errSend
+	}
+	return packet, nil
 }

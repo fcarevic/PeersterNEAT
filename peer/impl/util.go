@@ -3,6 +3,7 @@ package impl
 import (
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
+	"sort"
 )
 
 // TTL Define const
@@ -45,7 +46,10 @@ func contains(elems []string, v string) bool {
 	return false
 }
 
-func copyStatusRumorMaps(statusMap map[string]uint, rumorMap map[string][]types.Rumor) (map[string]uint, map[string][]types.Rumor) {
+func copyStatusRumorMaps(
+	statusMap map[string]uint,
+	rumorMap map[string][]types.Rumor) (map[string]uint,
+	map[string][]types.Rumor) {
 	var statusCopy = make(map[string]uint)
 	for k, v := range statusMap {
 		statusCopy[k] = v
@@ -55,11 +59,17 @@ func copyStatusRumorMaps(statusMap map[string]uint, rumorMap map[string][]types.
 
 	for peer, rumorArray := range rumorMap {
 		var rumorArrayCopy []types.Rumor
-		for _, rumor := range rumorArray {
-			rumorArrayCopy = append(rumorArrayCopy, rumor)
-		}
+		rumorArrayCopy = append(rumorArrayCopy, rumorArray...)
 		rumorMapCopy[peer] = rumorArrayCopy
 	}
 
 	return statusCopy, rumorMapCopy
+}
+
+// Sort rumors
+func sortRumors(rumors []types.Rumor) []types.Rumor {
+	sort.Slice(rumors, func(i, j int) bool {
+		return rumors[i].Sequence < rumors[j].Sequence
+	})
+	return rumors
 }

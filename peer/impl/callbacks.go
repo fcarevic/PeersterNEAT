@@ -212,10 +212,14 @@ func (n *node) privateMessageCallback(msg types.Message, pkt transport.Packet) e
 		pkt := msgToPacket(pkt.Header.Source, pkt.Header.RelayedBy, pkt.Header.Destination, *privateMsg.Msg)
 		err := n.conf.MessageRegistry.ProcessPacket(pkt)
 		if err != nil {
-			log.Error().Msgf("[%s]: PrivateMessageCallback: Failed in processing private message: %s", privateMsg)
+			log.Error().Msgf("[%s]: PrivateMessageCallback: Failed in processing private message %s",
+				n.conf.Socket.GetAddress(),
+				privateMsg)
 			return err
 		}
-		log.Info().Msgf("[%s]: PrivateMessageCallback: Processed private message", privateMsg)
+		log.Info().Msgf("[%s]: PrivateMessageCallback: Processed private message %s",
+			n.conf.Socket.GetAddress(),
+			privateMsg)
 
 	}
 	return nil

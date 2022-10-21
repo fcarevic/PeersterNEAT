@@ -30,7 +30,7 @@ func (n *node) heartbeat() {
 		// Broadcast
 		errBroadcast := n.Broadcast(emptyMsg)
 		if errBroadcast != nil {
-			log.Error().Msgf("[%s]: Heartbeat: Broadcast error",
+			log.Error().Msgf("[%s]: Heartbeat: Broadcast error: %s",
 				n.conf.Socket.GetAddress(),
 				errBroadcast.Error(),
 			)

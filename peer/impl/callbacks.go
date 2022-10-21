@@ -136,8 +136,6 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 	// Process the status message
 	missing, rumorsToSend := n.processStatus(*statusMsg)
 
-	log.Error().Msgf("[%s] %s, len %d , %s", n.conf.Socket.GetAddress(), missing, len(rumorsToSend), rumorsToSend)
-
 	// If I am missing rumors, send status message to origin
 	if missing {
 		var myStatusMsg, _ = n.getStatusMaps()
@@ -217,7 +215,7 @@ func (n *node) privateMessageCallback(msg types.Message, pkt transport.Packet) e
 			log.Error().Msgf("[%s]: PrivateMessageCallback: Failed in processing private message: %s", privateMsg)
 			return err
 		}
-		log.Info().Msgf("[%s]: PrivateMessageCallback: Processed private message: %s", privateMsg)
+		log.Info().Msgf("[%s]: PrivateMessageCallback: Processed private message", privateMsg)
 
 	}
 	return nil

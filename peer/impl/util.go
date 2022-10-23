@@ -62,7 +62,6 @@ func copyStatusRumorMaps(
 		rumorArrayCopy = append(rumorArrayCopy, rumorArray...)
 		rumorMapCopy[peer] = rumorArrayCopy
 	}
-
 	return statusCopy, rumorMapCopy
 }
 

@@ -54,7 +54,7 @@ func copyStatusRumorMaps(
 	for k, v := range statusMap {
 		statusCopy[k] = v
 	}
-
+	
 	var rumorMapCopy = make(map[string][]types.Rumor)
 
 	for peer, rumorArray := range rumorMap {

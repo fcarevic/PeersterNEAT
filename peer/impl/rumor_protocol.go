@@ -413,6 +413,7 @@ func (n *node) startRumoring(
 					_ = n.processMsgByDummyPkt(
 						statusMsg, arrivedPkt.Header.Source, arrivedPkt.Header.RelayedBy, arrivedPkt.Header.Destination)
 					return
+
 				}
 			case <-timer.C:
 				// Unregister this packet

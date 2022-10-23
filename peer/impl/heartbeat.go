@@ -8,13 +8,13 @@ import (
 
 func (n *node) heartbeat() {
 
+	defer n.activeThreads.Done()
+
 	// If interval is 0, this should not be started
 	if n.conf.HeartbeatInterval == 0 {
-		n.activeThreads.Done()
 		return
 	}
 
-	n.antiEntropyHeartbeatWait.Wait()
 	log.Error().Msgf("[%s]: Heartbeat started", n.conf.Socket.GetAddress())
 	for {
 		// Check whether to stop the thread
@@ -43,5 +43,5 @@ func (n *node) heartbeat() {
 	}
 	log.Error().Msgf("[%s]: Heartbeat stopped", n.conf.Socket.GetAddress())
 	// Notify that the thread finished
-	n.activeThreads.Done()
+
 }

@@ -15,7 +15,6 @@ func (n *node) antiEntropy() {
 	}
 
 	// Wait for first peer to be added
-	n.antiEntropyHeartbeatWait.Wait()
 	log.Info().Msgf("[%s]: AntiEntropy started", n.conf.Socket.GetAddress())
 
 	// AE loop

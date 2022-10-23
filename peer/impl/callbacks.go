@@ -26,6 +26,11 @@ func (n *node) chatMessageCallback(msg types.Message, pkt transport.Packet) erro
 	return nil
 }
 
+// Callback function for Empty message
+func (n *node) emptyMessageCallback(msg types.Message, pkt transport.Packet) error {
+	return nil
+}
+
 // RumorMessageCallback Callback function for Rumor message
 func (n *node) RumorMessageCallback(msg types.Message, pkt transport.Packet) error {
 

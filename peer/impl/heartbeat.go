@@ -14,6 +14,7 @@ func (n *node) heartbeat() {
 		return
 	}
 
+	n.antiEntropyHeartbeatWait.Wait()
 	log.Error().Msgf("[%s]: Heartbeat started", n.conf.Socket.GetAddress())
 	for {
 		// Check whether to stop the thread

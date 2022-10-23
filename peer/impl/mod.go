@@ -66,14 +66,14 @@ type node struct {
 	rumorInfo RumorInfo
 
 	// Status flags
-	isRunning          bool
-	antiEntropyRunning bool
+	isRunning                   bool
+	antiEntropyHeartbeatRunning bool
 
 	//Semaphores
-	startStopMutex    sync.Mutex
-	routingTableMutex sync.RWMutex
-	activeThreads     sync.WaitGroup
-	antiEntropyWait   sync.WaitGroup
+	startStopMutex           sync.Mutex
+	routingTableMutex        sync.RWMutex
+	activeThreads            sync.WaitGroup
+	antiEntropyHeartbeatWait sync.WaitGroup
 }
 
 // Start implements peer.Service
@@ -103,7 +103,7 @@ func (n *node) Start() error {
 	go n.heartbeat()
 
 	n.activeThreads.Add(1)
-	n.antiEntropyWait.Add(1)
+	n.antiEntropyHeartbeatWait.Add(1)
 	go n.antiEntropy()
 	return nil
 }
@@ -132,12 +132,12 @@ func (n *node) Stop() error {
 	n.isRunning = false
 
 	// Check if antiEntropy is running
-	if n.antiEntropyRunning {
-		n.antiEntropyRunning = false
+	if n.antiEntropyHeartbeatRunning {
+		n.antiEntropyHeartbeatRunning = false
 	} else {
 		// if not running implies waiting for peer to be added to routing table
 		// Awake it
-		n.antiEntropyWait.Done()
+		n.antiEntropyHeartbeatWait.Done()
 	}
 	n.startStopMutex.Unlock()
 
@@ -185,9 +185,9 @@ func (n *node) AddPeer(addr ...string) {
 
 		// Start the antiEntropy if not running
 		n.startStopMutex.Lock()
-		if !(n.antiEntropyRunning) {
-			n.antiEntropyRunning = true
-			n.antiEntropyWait.Done()
+		if !(n.antiEntropyHeartbeatRunning) {
+			n.antiEntropyHeartbeatRunning = true
+			n.antiEntropyHeartbeatWait.Done()
 		}
 		n.startStopMutex.Unlock()
 	}

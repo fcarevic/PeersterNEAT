@@ -35,6 +35,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 				types.AckMessage
 			}),
 		},
+		dataSharing: DataSharing{
+			catalog: make(peer.Catalog),
+		},
 	}
 
 	// Add self-address to routing table
@@ -64,6 +67,9 @@ type node struct {
 
 	// Rumor protocol
 	rumorInfo RumorInfo
+
+	// Data sharing
+	dataSharing DataSharing
 
 	// Status flags
 	isRunning                   bool

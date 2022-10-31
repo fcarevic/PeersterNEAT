@@ -36,7 +36,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			}),
 		},
 		dataSharing: DataSharing{
-			catalog: make(peer.Catalog),
+			catalog:         make(peer.Catalog),
+			dataRequestsMap: make(map[string]chan []byte),
 		},
 	}
 
@@ -50,6 +51,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StatusMessage{}, n.statusMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PrivateMessage{}, n.privateMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, n.emptyMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.DataRequestMessage{}, n.dataRequestsMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.DataReplyMessage{}, n.dataReplyMessageCallback)
 
 	return &n
 }

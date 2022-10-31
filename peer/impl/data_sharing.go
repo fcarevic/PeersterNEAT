@@ -3,17 +3,25 @@ package impl
 import (
 	"crypto"
 	"encoding/hex"
+	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
+	"go.dedis.ch/cs438/types"
+	"golang.org/x/xerrors"
 	"io"
+	"math/rand"
+	"strings"
 	"sync"
+	"time"
 )
 
 type DataSharing struct {
-	catalog peer.Catalog
+	catalog         peer.Catalog
+	dataRequestsMap map[string]chan []byte
 
 	// Semaphores
-	catalogMutex sync.Mutex
+	catalogMutex        sync.Mutex
+	dataRequestMapMutex sync.Mutex
 }
 
 // GetCatalog returns the peer's catalog.
@@ -27,8 +35,8 @@ func (n *node) GetCatalog() peer.Catalog {
 	catalogCopy := make(peer.Catalog)
 	for dataKey, peerMap := range n.dataSharing.catalog {
 		peerMapCopy := make(map[string]struct{})
-		for peer, v := range peerMap {
-			peerMapCopy[peer] = v
+		for peerAddress, v := range peerMap {
+			peerMapCopy[peerAddress] = v
 		}
 		catalogCopy[dataKey] = peerMapCopy
 	}
@@ -106,6 +114,155 @@ func (n *node) Upload(data io.Reader) (metahash string, err error) {
 		n.conf.Storage.GetDataBlobStore().Set(metafileKey, []byte(metafileValue))
 		return metafileKey, nil
 	}
+}
+
+func (n *node) Download(metahash string) ([]byte, error) {
+
+	// Get metafile
+	metafileValueBytes, err := n.getValueForMetahash(metahash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract parts of the file
+	fileParts := strings.Split(string(metafileValueBytes), peer.MetafileSep)
+	var mapOfParts = make(map[string][]byte)
+	var file []byte
+	for _, key := range fileParts {
+
+		// Get value locally or remotely
+		value, errValue := n.getValueForMetahash(key)
+		if errValue != nil {
+			return nil, errValue
+		}
+		// Append to file
+		file = append(file, value...)
+
+		// Add to map
+		mapOfParts[key] = value
+	}
+
+	// Store locally if successful
+	for k, v := range mapOfParts {
+		n.conf.Storage.GetDataBlobStore().Set(k, v)
+	}
+	return file, nil
+}
+
+func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
+
+	// Load from storage if exist
+	localValue := n.conf.Storage.GetDataBlobStore().Get(metahash)
+	if len(localValue) != 0 {
+		return localValue, nil
+	}
+
+	// Get from remote peer
+	var peerAddress, err = n.getRandomPeerForDownload(metahash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create DataRequestMessage
+	msg := types.DataRequestMessage{
+		RequestID: xid.New().String(),
+		Key:       metahash,
+	}
+
+	// Convert to transport.Message
+	transportMessage, errCast := n.conf.MessageRegistry.MarshalMessage(msg)
+	if errCast != nil {
+		return nil, errCast
+	}
+	// Register msg
+	var channel = make(chan []byte)
+	n.registerDataRequestMessage(msg, channel)
+	defer n.unregisterDataRequestMessage(msg)
+
+	// Initialize backoff mechanism
+	var duration = n.conf.BackoffDataRequest.Initial
+	var i uint = 0
+	for i < n.conf.BackoffDataRequest.Retry {
+		// Send msg
+		errSend := n.Unicast(peerAddress, transportMessage)
+		if errSend != nil {
+			return nil, errSend
+		}
+
+		// Wait for timeout
+		select {
+		case bytes := <-channel:
+			if bytes == nil {
+				return nil, xerrors.Errorf("Nil bytes received")
+			} else {
+				return bytes, nil
+			}
+
+		case <-time.After(duration):
+			duration = duration * time.Duration(
+				n.conf.BackoffDataRequest.Factor)
+			break
+		}
+
+		i = i + 1
+	}
+	return nil, xerrors.Errorf("Failed to send")
+}
+
+func (n *node) getRandomPeerForDownload(metahash string) (string, error) {
+
+	// Get catalog
+	catalog := n.GetCatalog()
+
+	// Check if exist peers for the metahash
+	var peerMap, ok = catalog[metahash]
+	if !ok {
+		return "", xerrors.Errorf("No information for random download peer.")
+	}
+
+	// Get random peer
+	var peers []string
+	for k := range peerMap {
+		peers = append(peers, k)
+	}
+	return peers[rand.Intn(len(peers))], nil
+}
+
+func (n *node) registerDataRequestMessage(msg types.DataRequestMessage, channel chan []byte) {
+
+	// Acquire lock
+	n.dataSharing.dataRequestMapMutex.Lock()
+	defer n.dataSharing.dataRequestMapMutex.Unlock()
+
+	// Add to map
+	n.dataSharing.dataRequestsMap[msg.RequestID] = channel
+
+}
+func (n *node) unregisterDataRequestMessage(msg types.DataRequestMessage) {
+	// Acquire lock
+	n.dataSharing.dataRequestMapMutex.Lock()
+	defer n.dataSharing.dataRequestMapMutex.Unlock()
+
+	// Delete from map and close channel
+	channel, ok := n.dataSharing.dataRequestsMap[msg.RequestID]
+	if ok {
+		close(channel)
+		delete(n.dataSharing.dataRequestsMap, msg.RequestID)
+	}
+}
+
+func (n *node) processDataReply(replyMsg types.DataReplyMessage) {
+
+	// Acquire lock
+	n.dataSharing.dataRequestMapMutex.Lock()
+	defer n.dataSharing.dataRequestMapMutex.Unlock()
+
+	// Send to map if exist
+	channel, ok := n.dataSharing.dataRequestsMap[replyMsg.RequestID]
+	if ok {
+		channel <- replyMsg.Value
+	}
+	return
 }
 
 /// DELETE

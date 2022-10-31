@@ -207,7 +207,7 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 func (n *node) privateMessageCallback(msg types.Message, pkt transport.Packet) error {
 	privateMsg, ok := msg.(*types.PrivateMessage)
 	if !ok {
-		return xerrors.Errorf("Failed to cast to Chat message got wrong type: %T", msg)
+		return xerrors.Errorf("Failed to cast to private message got wrong type: %T", msg)
 	}
 
 	// Check if the node is a recipient and process the message
@@ -227,5 +227,39 @@ func (n *node) privateMessageCallback(msg types.Message, pkt transport.Packet) e
 			privateMsg)
 
 	}
+	return nil
+}
+
+func (n *node) dataRequestsMessageCallback(msg types.Message, pkt transport.Packet) error {
+	dataRequestMsg, ok := msg.(*types.DataRequestMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to dataaRequestMessage message got wrong type: %T", msg)
+	}
+
+	// Get requested data
+	data := n.conf.Storage.GetDataBlobStore().Get(dataRequestMsg.Key)
+
+	// Craft msg
+	reply := types.DataReplyMessage{
+		Key:       dataRequestMsg.Key,
+		RequestID: dataRequestMsg.RequestID,
+		Value:     data,
+	}
+
+	// Send msg
+	msgTransport, err := n.conf.MessageRegistry.MarshalMessage(reply)
+	if err != nil {
+		return err
+	}
+	errUnicast := n.Unicast(pkt.Header.Source, msgTransport)
+	return errUnicast
+}
+
+func (n *node) dataReplyMessageCallback(msg types.Message, pkt transport.Packet) error {
+	dataReplyMsg, ok := msg.(*types.DataReplyMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to DataReplyMessage message got wrong type: %T", msg)
+	}
+	n.processDataReply(*dataReplyMsg)
 	return nil
 }

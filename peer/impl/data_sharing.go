@@ -76,7 +76,7 @@ func (n *node) Upload(data io.Reader) (metahash string, err error) {
 	for {
 		chunk := make([]byte, n.conf.ChunkSize)
 		numBytes, errRead := data.Read(chunk)
-		if errRead != nil && err != io.EOF {
+		if errRead != nil && errRead != io.EOF {
 			log.Error().Msgf("[%s]: Upload: error while reading the file: %s",
 				n.conf.Socket.GetAddress(),
 				errRead.Error())
@@ -94,10 +94,10 @@ func (n *node) Upload(data io.Reader) (metahash string, err error) {
 			if len(metafileValue) != 0 {
 				metafileValue = metafileValue + peer.MetafileSep
 			}
-			metafileValue = metafileValue + hex.EncodeToString(hashSHA256(chunk))
+			metafileValue = metafileValue + hex.EncodeToString(hashSHA256(chunk[:numBytes]))
 
 			// Add this chunk to storage
-			hash := hashSHA256(chunk)
+			hash := hashSHA256(chunk[:numBytes])
 			metafileKeyParts = append(metafileKeyParts, hash...)
 			key := hex.EncodeToString(hash)
 			n.conf.Storage.GetDataBlobStore().Set(key, chunk[:numBytes])
@@ -110,7 +110,7 @@ func (n *node) Upload(data io.Reader) (metahash string, err error) {
 		}
 
 		// If EOF, add to storage
-		metafileKey := hex.EncodeToString(metafileKeyParts)
+		metafileKey := hex.EncodeToString(hashSHA256(metafileKeyParts))
 		n.conf.Storage.GetDataBlobStore().Set(metafileKey, []byte(metafileValue))
 		return metafileKey, nil
 	}

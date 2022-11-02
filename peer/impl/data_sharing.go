@@ -10,18 +10,23 @@ import (
 	"golang.org/x/xerrors"
 	"io"
 	"math/rand"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
 
 type DataSharing struct {
-	catalog         peer.Catalog
-	dataRequestsMap map[string]chan []byte
+	catalog                    peer.Catalog
+	dataRequestsMap            map[string]chan []byte
+	receivedRequests           map[string]bool
+	remoteFullyKnownMetahashes map[string]bool
 
 	// Semaphores
-	catalogMutex        sync.Mutex
-	dataRequestMapMutex sync.Mutex
+	catalogMutex                    sync.Mutex
+	dataRequestMapMutex             sync.Mutex
+	receivedRequestsMutex           sync.Mutex
+	remoteFullyKnownMetahashesMutex sync.Mutex
 }
 
 // GetCatalog returns the peer's catalog.
@@ -265,31 +270,218 @@ func (n *node) processDataReply(replyMsg types.DataReplyMessage) {
 	return
 }
 
+// Tag creates a mapping between a (file)name and a metahash.
+func (n *node) Tag(name string, mh string) error {
+	n.conf.Storage.GetNamingStore().Set(name, []byte(mh))
+	return nil
+}
+
+// Resolve returns the corresponding metahash of a given (file)name. Returns
+// an empty string if not found.
+func (n *node) Resolve(name string) (metahash string) {
+	bytes := n.conf.Storage.GetNamingStore().Get(name)
+	if bytes == nil {
+		return ""
+	}
+	return string(bytes)
+}
+
+// SearchAll returns all the names that exist matching the given regex. It
+// merges results from the local storage and from the search request reply
+// sent to a random neighbor using the provided budget. It makes the peer
+// update its catalog and name storage according to the SearchReplyMessages
+// received. Returns an empty result if nothing found. An error is returned
+// in case of an exceptional event.
+//
+// - Implemented in HW2
+func (n *node) SearchAll(reg regexp.Regexp, budget uint, timeout time.Duration) (names []string, err error) {
+
+	// Get matching names from remote peers
+	var peers []string
+	var counter uint = 0
+	for counter < budget {
+		peerAddress, errNeigh := n.getRangomNeighbour(peers)
+		if errNeigh != nil || peerAddress == "" {
+			break
+		}
+		peers = append(peers, peerAddress)
+		counter++
+	}
+
+	for ind, peerAddress := range peers {
+
+		// Calculate peer budget
+		peerBudget := budget / uint(len(peers))
+		reminder := budget % uint(len(peers))
+		if uint(ind) < reminder {
+			peerBudget++
+		}
+
+		// Craft search request
+		searchRequest := types.SearchRequestMessage{
+			RequestID: xid.New().String(),
+			Origin:    n.conf.Socket.GetAddress(),
+			Pattern:   reg.String(),
+			Budget:    peerBudget,
+		}
+
+		// Serialize request
+		transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(searchRequest)
+		if errCast != nil {
+			log.Error().Msgf("[%s] SearchAll:Failed to marshall the message : %s",
+				n.conf.Socket.GetAddress(), errCast.Error())
+		}
+
+		// Send request
+		errSend := n.Unicast(peerAddress, transportMsg)
+		if errSend != nil {
+			log.Error().Msgf("[%s] SearchAll:Failed to send the message : %s",
+				n.conf.Socket.GetAddress(), errSend.Error())
+		}
+	}
+
+	// Sleep and wait for the replies to be handled
+	time.Sleep(timeout)
+
+	// Get matching names from local storage
+	localNames := n.getFilenamesFromLocalStorage()
+	return localNames, nil
+}
+
+func (n *node) getFilenamesFromLocalStorage() []string {
+	var localNames []string
+	n.conf.Storage.GetNamingStore().ForEach(func(key string, val []byte) bool {
+		localNames = append(localNames, key)
+		return true
+	})
+	return localNames
+}
+
+func (n *node) getHashesOfChunksForFile(metahash string) [][]byte {
+	metafileValue := n.conf.Storage.GetDataBlobStore().Get(metahash)
+	if metafileValue == nil {
+		return nil
+	}
+	chunks := strings.Split(string(metafileValue), peer.MetafileSep)
+	var fileChunks [][]byte
+	for _, chunkTag := range chunks {
+		chunk := n.conf.Storage.GetDataBlobStore().Get(chunkTag)
+		if chunk != nil {
+			chunk = []byte(chunkTag)
+		}
+		fileChunks = append(fileChunks, chunk)
+	}
+	return fileChunks
+}
+
+func (n *node) checkDuplicateAndRegister(msg types.SearchRequestMessage) bool {
+	// Acquire lock
+	n.dataSharing.receivedRequestsMutex.Lock()
+	defer n.dataSharing.receivedRequestsMutex.Unlock()
+	_, ok := n.dataSharing.receivedRequests[msg.RequestID]
+	if !ok {
+		n.dataSharing.receivedRequests[msg.RequestID] = true
+	}
+	return ok
+}
+
+// SearchFirst uses an expanding ring configuration and returns a name as
+// soon as it finds a peer that "fully matches" a data blob. It makes the
+// peer update its catalog and name storage according to the
+// SearchReplyMessages received. Returns an empty string if nothing was
+// found.
+func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (name string, err error) {
+
+	// Check if fully known
+	var localNames = n.getFilenamesFromLocalStorage()
+	for _, localName := range localNames {
+		matched := pattern.MatchString(localName)
+		if matched {
+			if n.checkIfFullyKnown(localName) {
+				return localName, nil
+			}
+		}
+	}
+	// Search remote peers
+	initialBudget := conf.Initial
+	var cnt uint = 0
+	for cnt < conf.Retry {
+		// check if neighbours exist
+		_, errNeigh := n.getRangomNeighbour([]string{})
+		if errNeigh != nil {
+			return "", nil
+		}
+
+		// Search  all
+		_, errSearchAll := n.SearchAll(pattern, initialBudget, conf.Timeout)
+		if errSearchAll != nil {
+			log.Error().Msgf("[%s]: SearchFirst: error while calling search all: %s",
+				n.conf.Socket.GetAddress(),
+				errSearchAll.Error())
+		} else {
+
+			// Check if fully known
+			var names = n.getFilenamesFromLocalStorage()
+			for _, localName := range names {
+				matched := pattern.MatchString(localName)
+				if matched {
+					if n.checkIfFullyKnown(localName) {
+						return localName, nil
+					}
+				}
+			}
+		}
+		// Update budget and go again
+		initialBudget = initialBudget * conf.Factor
+		cnt++
+	}
+	return "", nil
+}
+
+func (n *node) updateFullyKnownMetahashesMap(fileInfo types.FileInfo) {
+	for _, chunk := range fileInfo.Chunks {
+		if chunk == nil {
+			return
+		}
+	}
+	//Acquire lock
+	n.dataSharing.remoteFullyKnownMetahashesMutex.Lock()
+	defer n.dataSharing.remoteFullyKnownMetahashesMutex.Unlock()
+	n.dataSharing.remoteFullyKnownMetahashes[fileInfo.Metahash] = true
+}
+
+func (n *node) checkIfFullyKnown(name string) bool {
+	// Check locally
+	metahashBytes := n.conf.Storage.GetNamingStore().Get(name)
+	if metahashBytes == nil {
+		return false
+	}
+	metahash := string(metahashBytes)
+	chunks := n.getHashesOfChunksForFile(metahash)
+	if chunks != nil {
+		fullyKnown := true
+		for _, chunk := range chunks {
+			if chunk == nil {
+				fullyKnown = false
+			}
+			if fullyKnown {
+				return true
+			}
+		}
+	}
+
+	// Check if known remotely
+	// Acquire lock
+	n.dataSharing.remoteFullyKnownMetahashesMutex.Lock()
+	defer n.dataSharing.remoteFullyKnownMetahashesMutex.Unlock()
+	_, ok := n.dataSharing.remoteFullyKnownMetahashes[metahash]
+	return ok
+}
+
 /// DELETE
 //// DataSharing describes functions to share data in a bittorrent-like system.
 //type DataSharing interface {
 
-//
-//	// Download will get all the necessary chunks corresponding to the given
-//	// metahash that references a blob, and return a reconstructed blob. The
-//	// peer will save locally the chunks that it doesn't have for further
-//	// sharing. Returns an error if it can't get the necessary chunks.
-//	//
-//	// - Implemented in HW2
-//	Download(metahash string) ([]byte, error)
-//
-//	// Tag creates a mapping between a (file)name and a metahash.
-//	//
-//	// - Implemented in HW2
-//	// - Improved in HW3: ensure uniqueness with blockchain/TLC/Paxos
-//	Tag(name string, mh string) error
-//
-//	// Resolve returns the corresponding metahash of a given (file)name. Returns
-//	// an empty string if not found.
-//	//
-//	// - Implemented in HW2
-//	Resolve(name string) (metahash string)
-//
 //	// SearchAll returns all the names that exist matching the given regex. It
 //	// merges results from the local storage and from the search request reply
 //	// sent to a random neighbor using the provided budget. It makes the peer

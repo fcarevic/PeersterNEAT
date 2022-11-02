@@ -36,8 +36,10 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			}),
 		},
 		dataSharing: DataSharing{
-			catalog:         make(peer.Catalog),
-			dataRequestsMap: make(map[string]chan []byte),
+			catalog:                    make(peer.Catalog),
+			dataRequestsMap:            make(map[string]chan []byte),
+			receivedRequests:           make(map[string]bool),
+			remoteFullyKnownMetahashes: make(map[string]bool),
 		},
 	}
 
@@ -53,6 +55,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, n.emptyMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.DataRequestMessage{}, n.dataRequestsMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.DataReplyMessage{}, n.dataReplyMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.SearchRequestMessage{}, n.searchRequestMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.SearchReplyMessage{}, n.searchReplyMessageCallback)
 
 	return &n
 }
@@ -123,6 +127,8 @@ func (n *node) Stop() error {
 		log.Error().Msg("Node is nil")
 		return xerrors.Errorf("Node is nil.")
 	}
+
+	log.Info().Msgf("[%s]: Stopping node", n.conf.Socket.GetAddress())
 
 	// acquire lock
 	n.startStopMutex.Lock()

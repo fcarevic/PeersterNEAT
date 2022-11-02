@@ -6,6 +6,7 @@ import (
 	"go.dedis.ch/cs438/types"
 	"golang.org/x/xerrors"
 	"math/rand"
+	"regexp"
 )
 
 // Callback function for chat message
@@ -261,5 +262,147 @@ func (n *node) dataReplyMessageCallback(msg types.Message, pkt transport.Packet)
 		return xerrors.Errorf("Failed to cast to DataReplyMessage message got wrong type: %T", msg)
 	}
 	n.processDataReply(*dataReplyMsg)
+	return nil
+}
+
+func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Packet) error {
+	searchRequestMsg, ok := msg.(*types.SearchRequestMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to DataReplyMessage message got wrong type: %T", msg)
+	}
+
+	if n.checkDuplicateAndRegister(*searchRequestMsg) {
+		return nil
+	}
+
+	// Update budget
+	budget := searchRequestMsg.Budget - 1
+
+	// Forward request
+	if budget > 0 {
+		var peers []string
+		var excludedPeers = []string{searchRequestMsg.Origin}
+		for uint(len(peers)) < budget {
+			peerAddress, errNeigh := n.getRangomNeighbour(excludedPeers)
+			if errNeigh != nil || peerAddress == "" {
+				break
+			}
+			peers = append(peers, peerAddress)
+			excludedPeers = append(excludedPeers, peerAddress)
+		}
+
+		for ind, peerAddress := range peers {
+			var peerBudget = budget / uint(len(peers))
+			if uint(ind) < budget%uint(len(peers)) {
+				peerBudget++
+			}
+			msg = types.SearchRequestMessage{
+				RequestID: searchRequestMsg.RequestID,
+				Budget:    peerBudget,
+				Pattern:   searchRequestMsg.Pattern,
+				Origin:    searchRequestMsg.Origin,
+			}
+
+			transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(msg)
+			if errCast != nil {
+				log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to marshall msg: %s",
+					n.conf.Socket.GetAddress(), errCast.Error())
+			}
+			errSend := n.Unicast(peerAddress, transportMsg)
+			if errSend != nil {
+				log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send unicast: %s",
+					n.conf.Socket.GetAddress(), errSend.Error())
+			}
+
+		}
+	}
+
+	// Get filename by regex
+	localNames := n.getFilenamesFromLocalStorage()
+	var fileInfos []types.FileInfo
+	for _, name := range localNames {
+		matched, errMatch := regexp.MatchString(searchRequestMsg.Pattern, name)
+
+		if errMatch != nil {
+			continue
+		}
+		if matched {
+			metahash := string(n.conf.Storage.GetNamingStore().Get(name))
+			chunks := n.getHashesOfChunksForFile(metahash)
+			if chunks != nil {
+				fileInfo := types.FileInfo{
+					Name:     name,
+					Metahash: metahash,
+					Chunks:   chunks,
+				}
+				fileInfos = append(fileInfos, fileInfo)
+			}
+
+		}
+
+	}
+
+	// Create reply msg
+	replyMsg := types.SearchReplyMessage{
+		RequestID: searchRequestMsg.RequestID,
+		Responses: fileInfos,
+	}
+
+	// Convert to packet
+	packet, errPkt := n.msgTypesToPacket(
+		n.conf.Socket.GetAddress(),
+		n.conf.Socket.GetAddress(),
+		searchRequestMsg.Origin,
+		replyMsg)
+	if errPkt != nil {
+		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to craft packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error())
+		return errPkt
+	}
+
+	// Send packet
+	errSend := n.conf.Socket.Send(pkt.Header.Source, packet, TIMEOUT)
+	if errSend != nil {
+		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error())
+		return errSend
+	}
+	return nil
+}
+
+func (n *node) searchReplyMessageCallback(msg types.Message, pkt transport.Packet) error {
+	searchReplyMsg, ok := msg.(*types.SearchReplyMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to SearchReplyMessage message got wrong type: %T", msg)
+	}
+
+	// Update naming store and catalog
+	for _, fileInfo := range searchReplyMsg.Responses {
+
+		// Update naming storage
+		errTag := n.Tag(fileInfo.Name, fileInfo.Metahash)
+		if errTag != nil {
+			log.Error().Msgf("[%s]: searchReplyMessageCallback: Unable to tag: %s",
+				n.conf.Socket.GetAddress(),
+				errTag.Error())
+		}
+
+		// Update fullyKnown map
+		n.updateFullyKnownMetahashesMap(fileInfo)
+		// Update catalog
+		n.UpdateCatalog(fileInfo.Metahash, pkt.Header.Source)
+		for _, chunkTagByte := range fileInfo.Chunks {
+			if chunkTagByte == nil {
+				continue
+			}
+			chunkTag := string(chunkTagByte)
+			n.UpdateCatalog(chunkTag, pkt.Header.Source)
+		}
+	}
+	log.Info().Msgf("[%s] SearchReplyCallback: %s",
+		n.conf.Socket.GetAddress(),
+		searchReplyMsg)
+	// TODO: What do we do here??
+
 	return nil
 }

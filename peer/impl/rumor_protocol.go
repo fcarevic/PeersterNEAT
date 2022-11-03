@@ -420,6 +420,11 @@ func (n *node) startRumoring(
 				n.rumorInfo.unregisterRumorMessageForAck(packet)
 				// Add this neighbour to list of excluded ones
 				exclNeighbors = append(exclNeighbors, packet.Header.Destination)
+				break
+
+			case <-n.notifyEnd:
+				n.rumorInfo.unregisterRumorMessageForAck(packet)
+				return
 			}
 		}
 	}()

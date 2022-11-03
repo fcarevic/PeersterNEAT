@@ -34,8 +34,13 @@ func (n *node) antiEntropy() {
 		//log.Info().Msgf("[%s]: AntiEntropy: Sent successfully", n.conf.Socket.GetAddress())
 
 		// Sleep
-		time.Sleep(n.conf.AntiEntropyInterval)
+		select {
+		case <-time.After(n.conf.AntiEntropyInterval):
+			break
+		case <-n.notifyEnd:
+			break
 
+		}
 	}
 	log.Error().Msgf("[%s]: AntiEntropy stopped", n.conf.Socket.GetAddress())
 	// Notify that the thread finished

@@ -27,6 +27,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		isRunning:    false,
 		routingTable: make(map[string]string),
 		conf:         conf,
+		notifyEnd:    make(chan string),
 		rumorInfo: RumorInfo{
 			peerSequences: make(map[string]uint),
 			peerRumors:    make(map[string][]types.Rumor),
@@ -82,6 +83,9 @@ type node struct {
 	isRunning                   bool
 	antiEntropyHeartbeatRunning bool
 
+	// Channels
+	notifyEnd chan string
+
 	//Semaphores
 	startStopMutex    sync.Mutex
 	routingTableMutex sync.RWMutex
@@ -136,6 +140,7 @@ func (n *node) Stop() error {
 		return xerrors.Errorf("Node is not running.")
 	}
 	n.isRunning = false
+	close(n.notifyEnd)
 	n.startStopMutex.Unlock()
 
 	// Wait for all threads to finish

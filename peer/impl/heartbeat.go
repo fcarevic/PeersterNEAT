@@ -38,7 +38,13 @@ func (n *node) heartbeat() {
 		}
 
 		// Sleep
-		time.Sleep(n.conf.HeartbeatInterval)
+		select {
+		case <-time.After(n.conf.HeartbeatInterval):
+			break
+		case <-n.notifyEnd:
+			break
+
+		}
 
 	}
 	log.Error().Msgf("[%s]: Heartbeat stopped", n.conf.Socket.GetAddress())

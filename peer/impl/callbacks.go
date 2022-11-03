@@ -186,7 +186,7 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 	// Continue mongering
 	if len(rumorsToSend) == 0 && !missing {
 		r := rand.Float64()
-		if r <= n.conf.ContinueMongering {
+		if r < n.conf.ContinueMongering {
 
 			// Create a status msg
 			var statusMsg, _ = n.getStatusMaps()

@@ -128,11 +128,10 @@ func (n *node) Stop() error {
 		return xerrors.Errorf("Node is nil.")
 	}
 
-	log.Info().Msgf("[%s]: Stopping node", n.conf.Socket.GetAddress())
-
 	// acquire lock
 	n.startStopMutex.Lock()
 	if !n.isRunning {
+		n.startStopMutex.Unlock()
 		log.Error().Msg("Attempt to stop non-running node")
 		return xerrors.Errorf("Node is not running.")
 	}

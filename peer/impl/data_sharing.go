@@ -336,13 +336,13 @@ func (n *node) getHashesOfChunksForFile(metahash string) [][]byte {
 	return fileChunks
 }
 
-func (n *node) checkDuplicateAndRegister(msg types.SearchRequestMessage) bool {
+func (n *node) checkDuplicateAndRegister(requestID string) bool {
 	// Acquire lock
 	n.dataSharing.receivedRequestsMutex.Lock()
 	defer n.dataSharing.receivedRequestsMutex.Unlock()
-	_, ok := n.dataSharing.receivedRequests[msg.RequestID]
+	_, ok := n.dataSharing.receivedRequests[requestID]
 	if !ok {
-		n.dataSharing.receivedRequests[msg.RequestID] = true
+		n.dataSharing.receivedRequests[requestID] = true
 	}
 	return ok
 }
@@ -426,6 +426,7 @@ func (n *node) sendSearchRequestRandomly(budget uint, id string, pattern regexp.
 		if errNeigh != nil || peerAddress == "" {
 			break
 		}
+
 		peers = append(peers, peerAddress)
 		counter++
 	}
@@ -436,6 +437,8 @@ func (n *node) sendSearchRequestRandomly(budget uint, id string, pattern regexp.
 	if len(peers) == 0 {
 		return false
 	}
+
+	n.checkDuplicateAndRegister(id)
 
 	for ind, peerAddress := range peers {
 

@@ -271,7 +271,7 @@ func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Pac
 		return xerrors.Errorf("Failed to cast to DataReplyMessage message got wrong type: %T", msg)
 	}
 
-	if n.checkDuplicateAndRegister(*searchRequestMsg) {
+	if n.checkDuplicateAndRegister(searchRequestMsg.RequestID) {
 		log.Info().Msgf("[%s]: recID %s DUPLIUCATE | relayed from %s | req origin %s",
 			n.conf.Socket.GetAddress(), searchRequestMsg.RequestID,
 			pkt.Header.RelayedBy, searchRequestMsg.Origin)

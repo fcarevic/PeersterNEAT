@@ -20,7 +20,7 @@ type DataSharing struct {
 	catalog                    peer.Catalog
 	dataRequestsMap            map[string]chan []byte
 	receivedRequests           map[string]bool
-	remoteFullyKnownMetahashes map[string]bool
+	remoteFullyKnownMetahashes map[string]chan string
 
 	// Semaphores
 	catalogMutex                    sync.Mutex
@@ -296,52 +296,14 @@ func (n *node) Resolve(name string) (metahash string) {
 // - Implemented in HW2
 func (n *node) SearchAll(reg regexp.Regexp, budget uint, timeout time.Duration) (names []string, err error) {
 
-	// Get matching names from remote peers
-	var peers []string
-	var counter uint = 0
-	for counter < budget {
-		peerAddress, errNeigh := n.getRangomNeighbour(peers)
-		if errNeigh != nil || peerAddress == "" {
-			break
-		}
-		peers = append(peers, peerAddress)
-		counter++
+	// Get request ID
+	id := xid.New().String()
+
+	// Send search to random nodes
+	if n.sendSearchRequestRandomly(budget, id, reg) {
+		// Sleep and wait for the replies to be handled
+		time.Sleep(timeout)
 	}
-
-	for ind, peerAddress := range peers {
-
-		// Calculate peer budget
-		peerBudget := budget / uint(len(peers))
-		reminder := budget % uint(len(peers))
-		if uint(ind) < reminder {
-			peerBudget++
-		}
-
-		// Craft search request
-		searchRequest := types.SearchRequestMessage{
-			RequestID: xid.New().String(),
-			Origin:    n.conf.Socket.GetAddress(),
-			Pattern:   reg.String(),
-			Budget:    peerBudget,
-		}
-
-		// Serialize request
-		transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(searchRequest)
-		if errCast != nil {
-			log.Error().Msgf("[%s] SearchAll:Failed to marshall the message : %s",
-				n.conf.Socket.GetAddress(), errCast.Error())
-		}
-
-		// Send request
-		errSend := n.Unicast(peerAddress, transportMsg)
-		if errSend != nil {
-			log.Error().Msgf("[%s] SearchAll:Failed to send the message : %s",
-				n.conf.Socket.GetAddress(), errSend.Error())
-		}
-	}
-
-	// Sleep and wait for the replies to be handled
-	time.Sleep(timeout)
 
 	// Get matching names from local storage
 	localNames := n.getFilenamesFromLocalStorage()
@@ -397,60 +359,137 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (name
 	for _, localName := range localNames {
 		matched := pattern.MatchString(localName)
 		if matched {
-			if n.checkIfFullyKnown(localName) {
+			if n.checkIfFullyKnownLocally(localName) {
 				return localName, nil
 			}
 		}
 	}
-	// Search remote peers
+
+	channel := make(chan string)
+	var list_ids []string
+
+	defer func() {
+		n.unregisterFullyKnown(list_ids)
+		close(channel)
+	}()
+
 	initialBudget := conf.Initial
 	var cnt uint = 0
 	for cnt < conf.Retry {
-		// check if neighbours exist
-		_, errNeigh := n.getRangomNeighbour([]string{})
-		if errNeigh != nil {
+
+		// Search remote peers
+		id := xid.New().String()
+		list_ids = append(list_ids, id)
+		n.registerFullyKnown(id, channel)
+
+		// Send request search
+		if !n.sendSearchRequestRandomly(initialBudget, id, pattern) {
+			log.Info().Msgf(
+				"[%s]:sendSearchRequestRandomly: false",
+				n.conf.Socket.GetAddress())
 			return "", nil
 		}
 
-		// Search  all
-		_, errSearchAll := n.SearchAll(pattern, initialBudget, conf.Timeout)
-		if errSearchAll != nil {
-			log.Error().Msgf("[%s]: SearchFirst: error while calling search all: %s",
-				n.conf.Socket.GetAddress(),
-				errSearchAll.Error())
-		} else {
-
-			// Check if fully known
-			var names = n.getFilenamesFromLocalStorage()
-			for _, localName := range names {
-				matched := pattern.MatchString(localName)
-				if matched {
-					if n.checkIfFullyKnown(localName) {
-						return localName, nil
-					}
-				}
-			}
+		// Wait for the response
+		select {
+		case filename := <-channel:
+			return filename, err
+		case <-time.After(conf.Timeout):
+			break
 		}
 		// Update budget and go again
 		initialBudget = initialBudget * conf.Factor
 		cnt++
 	}
+
+	// Check if fully known
+	localNames = n.getFilenamesFromLocalStorage()
+	for _, localName := range localNames {
+		matched := pattern.MatchString(localName)
+		if matched {
+			if n.checkIfFullyKnownLocally(localName) {
+				return localName, nil
+			}
+		}
+	}
+
 	return "", nil
 }
 
-func (n *node) updateFullyKnownMetahashesMap(fileInfo types.FileInfo) {
-	for _, chunk := range fileInfo.Chunks {
-		if chunk == nil {
-			return
+func (n *node) sendSearchRequestRandomly(budget uint, id string, pattern regexp.Regexp) bool {
+	// Get matching names from remote peers
+	// Get matching names from remote peers
+	var peers []string
+	var counter uint = 0
+	for counter < budget {
+		peerAddress, errNeigh := n.getRangomNeighbour(peers)
+		if errNeigh != nil || peerAddress == "" {
+			break
+		}
+		peers = append(peers, peerAddress)
+		counter++
+	}
+	log.Info().Msgf(
+		"[%s]:sendSearchRequestRandomly: sneds to peeers: %s",
+		n.conf.Socket.GetAddress(),
+		peers)
+	if len(peers) == 0 {
+		return false
+	}
+
+	for ind, peerAddress := range peers {
+
+		// Calculate peer budget
+		peerBudget := budget / uint(len(peers))
+		reminder := budget % uint(len(peers))
+		if uint(ind) < reminder {
+			peerBudget++
+		}
+
+		// Craft search request
+		searchRequest := types.SearchRequestMessage{
+			RequestID: id,
+			Origin:    n.conf.Socket.GetAddress(),
+			Pattern:   pattern.String(),
+			Budget:    peerBudget,
+		}
+
+		// Serialize request
+		transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(searchRequest)
+		if errCast != nil {
+			log.Error().Msgf("[%s] SearchAll:Failed to marshall the message : %s",
+				n.conf.Socket.GetAddress(), errCast.Error())
+		}
+
+		// Send request
+		errSend := n.Unicast(peerAddress, transportMsg)
+		if errSend != nil {
+			log.Error().Msgf("[%s] SearchAll:Failed to send the message : %s",
+				n.conf.Socket.GetAddress(), errSend.Error())
 		}
 	}
+	return true
+}
+func (n *node) notifyFullyKnown(requestID string, filename string) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error().Msgf("[%s]: notifyFullyKnown: Panic on sending on the channel",
+				n.conf.Socket.GetAddress())
+		}
+	}()
 	//Acquire lock
 	n.dataSharing.remoteFullyKnownMetahashesMutex.Lock()
-	defer n.dataSharing.remoteFullyKnownMetahashesMutex.Unlock()
-	n.dataSharing.remoteFullyKnownMetahashes[fileInfo.Metahash] = true
+	channel, ok := n.dataSharing.remoteFullyKnownMetahashes[requestID]
+	n.dataSharing.remoteFullyKnownMetahashesMutex.Unlock()
+	log.Info().Msgf(
+		"[%s] received fully known %s",
+		n.conf.Socket.GetAddress(),
+		filename)
+	if ok {
+		channel <- filename
+	}
 }
-
-func (n *node) checkIfFullyKnown(name string) bool {
+func (n *node) checkIfFullyKnownLocally(name string) bool {
 	// Check locally
 	metahashBytes := n.conf.Storage.GetNamingStore().Get(name)
 	if metahashBytes == nil {
@@ -469,52 +508,26 @@ func (n *node) checkIfFullyKnown(name string) bool {
 			}
 		}
 	}
-
-	// Check if known remotely
+	return false
+}
+func (n *node) registerFullyKnown(requestID string, channel chan string) {
 	// Acquire lock
 	n.dataSharing.remoteFullyKnownMetahashesMutex.Lock()
 	defer n.dataSharing.remoteFullyKnownMetahashesMutex.Unlock()
-	_, ok := n.dataSharing.remoteFullyKnownMetahashes[metahash]
-	return ok
+	n.dataSharing.remoteFullyKnownMetahashes[requestID] = channel
 }
 
-/// DELETE
-//// DataSharing describes functions to share data in a bittorrent-like system.
-//type DataSharing interface {
-
-//	// SearchAll returns all the names that exist matching the given regex. It
-//	// merges results from the local storage and from the search request reply
-//	// sent to a random neighbor using the provided budget. It makes the peer
-//	// update its catalog and name storage according to the SearchReplyMessages
-//	// received. Returns an empty result if nothing found. An error is returned
-//	// in case of an exceptional event.
-//	//
-//	// - Implemented in HW2
-//	SearchAll(reg regexp.Regexp, budget uint, timeout time.Duration) (names []string, err error)
-//
-//	// SearchFirst uses an expanding ring configuration and returns a name as
-//	// soon as it finds a peer that "fully matches" a data blob. It makes the
-//	// peer update its catalog and name storage according to the
-//	// SearchReplyMessages received. Returns an empty string if nothing was
-//	// found.
-//	SearchFirst(pattern regexp.Regexp, conf ExpandingRing) (name string, err error)
-//}
-//
-
-//// ExpandingRing defines an expanding ring configuration.
-//type ExpandingRing struct {
-//	// Initial budget. Should be at least 1.
-//	Initial uint
-//
-//	// Budget is multiplied by factor after each try
-//	Factor uint
-//
-//	// Number of times to try. A value of 1 means there will be only 1 attempt.
-//	Retry uint
-//
-//	// Timeout before retrying when no response received.
-//	Timeout time.Duration
-//}
+func (n *node) unregisterFullyKnown(requestsID []string) {
+	// Acquire lock
+	n.dataSharing.remoteFullyKnownMetahashesMutex.Lock()
+	defer n.dataSharing.remoteFullyKnownMetahashesMutex.Unlock()
+	for _, requestID := range requestsID {
+		_, ok := n.dataSharing.remoteFullyKnownMetahashes[requestID]
+		if ok {
+			delete(n.dataSharing.remoteFullyKnownMetahashes, requestID)
+		}
+	}
+}
 
 // Hash data with SHA256
 func hashSHA256(data []byte) []byte {

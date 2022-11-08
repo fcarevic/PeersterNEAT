@@ -155,10 +155,10 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 			return errConvert
 		}
 		err := n.conf.Socket.Send(pkt.Header.Source, myStatusPkt, TIMEOUT)
-		log.Error().Msgf(
-			"[%s]: statusMessageCallback: Sending request to catch up to %s",
-			n.conf.Socket.GetAddress(),
-			pkt.Header.Source)
+		//log.Error().Msgf(
+		//	"[%s]: statusMessageCallback: Sending request to catch up to %s",
+		//	n.conf.Socket.GetAddress(),
+		//	pkt.Header.Source)
 		if err != nil {
 			log.Error().Msgf(
 				"[%s]: statusMessageCallback: Sending status failed",
@@ -171,10 +171,10 @@ func (n *node) statusMessageCallback(msg types.Message, pkt transport.Packet) er
 	// Send missing rumors to peer
 	if len(rumorsToSend) != 0 {
 		err := n.sendCatchUpRumors(rumorsToSend, pkt.Header.Source)
-		log.Info().Msgf(
-			"[%s]: statusMessageCallback: Sending extra rumors to %s",
-			n.conf.Socket.GetAddress(),
-			pkt.Header.Source)
+		//log.Info().Msgf(
+		//	"[%s]: statusMessageCallback: Sending extra rumors to %s",
+		//	n.conf.Socket.GetAddress(),
+		//	pkt.Header.Source)
 		if err != nil {
 			log.Error().Msgf(
 				"[%s]: statusMessageCallback: Sending extra rumors failed",
@@ -275,6 +275,55 @@ func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Pac
 		return nil
 	}
 
+	// Get filename by regex
+	localNames := n.getFilenamesFromLocalStorage()
+	var fileInfos []types.FileInfo
+	for _, name := range localNames {
+		matched, errMatch := regexp.MatchString(searchRequestMsg.Pattern, name)
+
+		if errMatch != nil {
+			continue
+		}
+		if matched {
+			metahash := string(n.conf.Storage.GetNamingStore().Get(name))
+			chunks := n.getHashesOfChunksForFile(metahash)
+			if chunks != nil {
+				fileInfo := types.FileInfo{
+					Name:     name,
+					Metahash: metahash,
+					Chunks:   chunks,
+				}
+				fileInfos = append(fileInfos, fileInfo)
+			}
+
+		}
+
+	}
+
+	// Create reply msg
+	replyMsg := types.SearchReplyMessage{
+		RequestID: searchRequestMsg.RequestID,
+		Responses: fileInfos,
+	}
+
+	// Convert to packet
+	packet, errPkt := n.msgTypesToPacket(
+		n.conf.Socket.GetAddress(),
+		n.conf.Socket.GetAddress(),
+		searchRequestMsg.Origin,
+		replyMsg)
+	if errPkt != nil {
+		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to craft packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error())
+	}
+
+	// Send packet
+	errSend := n.conf.Socket.Send(pkt.Header.Source, packet, TIMEOUT)
+	if errSend != nil {
+		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error())
+	}
+
 	// Update budget
 	budget := searchRequestMsg.Budget - 1
 
@@ -316,57 +365,6 @@ func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Pac
 
 		}
 	}
-
-	// Get filename by regex
-	localNames := n.getFilenamesFromLocalStorage()
-	var fileInfos []types.FileInfo
-	for _, name := range localNames {
-		matched, errMatch := regexp.MatchString(searchRequestMsg.Pattern, name)
-
-		if errMatch != nil {
-			continue
-		}
-		if matched {
-			metahash := string(n.conf.Storage.GetNamingStore().Get(name))
-			chunks := n.getHashesOfChunksForFile(metahash)
-			if chunks != nil {
-				fileInfo := types.FileInfo{
-					Name:     name,
-					Metahash: metahash,
-					Chunks:   chunks,
-				}
-				fileInfos = append(fileInfos, fileInfo)
-			}
-
-		}
-
-	}
-
-	// Create reply msg
-	replyMsg := types.SearchReplyMessage{
-		RequestID: searchRequestMsg.RequestID,
-		Responses: fileInfos,
-	}
-
-	// Convert to packet
-	packet, errPkt := n.msgTypesToPacket(
-		n.conf.Socket.GetAddress(),
-		n.conf.Socket.GetAddress(),
-		searchRequestMsg.Origin,
-		replyMsg)
-	if errPkt != nil {
-		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to craft packet: %s",
-			n.conf.Socket.GetAddress(), errPkt.Error())
-		return errPkt
-	}
-
-	// Send packet
-	errSend := n.conf.Socket.Send(pkt.Header.Source, packet, TIMEOUT)
-	if errSend != nil {
-		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send packet: %s",
-			n.conf.Socket.GetAddress(), errPkt.Error())
-		return errSend
-	}
 	return nil
 }
 
@@ -377,6 +375,7 @@ func (n *node) searchReplyMessageCallback(msg types.Message, pkt transport.Packe
 	}
 
 	// Update naming store and catalog
+	foundKnown := false
 	for _, fileInfo := range searchReplyMsg.Responses {
 
 		// Update naming storage
@@ -387,22 +386,25 @@ func (n *node) searchReplyMessageCallback(msg types.Message, pkt transport.Packe
 				errTag.Error())
 		}
 
-		// Update fullyKnown map
-		n.updateFullyKnownMetahashesMap(fileInfo)
 		// Update catalog
+		fullyKnown := true
 		n.UpdateCatalog(fileInfo.Metahash, pkt.Header.Source)
 		for _, chunkTagByte := range fileInfo.Chunks {
 			if chunkTagByte == nil {
+				fullyKnown = false
 				continue
 			}
 			chunkTag := string(chunkTagByte)
 			n.UpdateCatalog(chunkTag, pkt.Header.Source)
 		}
+		if !foundKnown && fullyKnown && len(fileInfo.Chunks) > 0 {
+			foundKnown = true
+			n.notifyFullyKnown(searchReplyMsg.RequestID, fileInfo.Name)
+		}
 	}
-	log.Info().Msgf("[%s] SearchReplyCallback: %s",
-		n.conf.Socket.GetAddress(),
-		searchReplyMsg)
-	// TODO: What do we do here??
+	//log.Info().Msgf("[%s] SearchReplyCallback: %s",
+	//	n.conf.Socket.GetAddress(),
+	//	searchReplyMsg)
 
 	return nil
 }

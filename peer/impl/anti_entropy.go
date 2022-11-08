@@ -31,7 +31,6 @@ func (n *node) antiEntropy() {
 		if err != nil {
 			log.Error().Msgf("[%s]: AntiEntropy: Sending failed", n.conf.Socket.GetAddress())
 		}
-		//log.Info().Msgf("[%s]: AntiEntropy: Sent successfully", n.conf.Socket.GetAddress())
 
 		// Sleep
 		select {
@@ -70,6 +69,6 @@ func (n *node) sendToRandomNeighbour(msg types.Message, excludePeers []string) e
 		log.Error().Msgf("[%s]: sendToRandomNeighbour: Sending message failed", n.conf.Socket.GetAddress())
 		return errSend
 	}
-	log.Info().Msgf("[%s]: sendToRandomNeighbour: Status message sent to %s", n.conf.Socket.GetAddress(), neighbour)
+
 	return nil
 }

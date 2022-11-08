@@ -109,7 +109,7 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 
 	// Add to the buffer of sent packets
 	s.outputBuffer.add(pkt)
-	log.Info().Msgf("%s: SOCKET SEND: successfully sent message: %s", s.GetAddress(), pkt)
+	//log.Info().Msgf("%s: SOCKET SEND: successfully sent message: %s", s.GetAddress(), pkt)
 	return nil
 }
 
@@ -156,7 +156,7 @@ func (s *Socket) Recv(timeout time.Duration) (transport.Packet, error) {
 
 	//WRITE TO A BUFFER
 	s.inputBuffer.add(pkt)
-	log.Info().Msgf("%s: SOCKET RECEIVE: successfully received packet: %s", s.GetAddress(), pkt.String())
+	//log.Info().Msgf("%s: SOCKET RECEIVE: successfully received packet: %s", s.GetAddress(), pkt.String())
 	return pkt, nil
 
 }

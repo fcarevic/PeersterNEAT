@@ -40,7 +40,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			catalog:                    make(peer.Catalog),
 			dataRequestsMap:            make(map[string]chan []byte),
 			receivedRequests:           make(map[string]bool),
-			remoteFullyKnownMetahashes: make(map[string]bool),
+			remoteFullyKnownMetahashes: make(map[string]chan string),
 		},
 	}
 

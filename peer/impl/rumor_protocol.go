@@ -45,9 +45,9 @@ func (rumorInfo *RumorInfo) registerNewRumor(rumor types.Rumor, origin string) t
 func (rumorInfo *RumorInfo) registerRumorMessageForAck(
 	pkt transport.Packet,
 	channel chan struct {
-	transport.Packet
-	types.AckMessage
-}) {
+		transport.Packet
+		types.AckMessage
+	}) {
 
 	// Acquire lock
 	rumorInfo.pktToChannelMutex.Lock()
@@ -272,7 +272,7 @@ func (n *node) sendAckForRumorPacket(pkt transport.Packet, statusMap map[string]
 			errSend.Error())
 		return errSend
 	}
-	log.Info().Msgf("[%s]: sendAckForRumorPacket: Sent ACK to %s", n.conf.Socket.GetAddress(), receivedFrom)
+	//log.Info().Msgf("[%s]: sendAckForRumorPacket: Sent ACK to %s", n.conf.Socket.GetAddress(), receivedFrom)
 	return nil
 }
 
@@ -333,10 +333,10 @@ func (n *node) changePacketHeaderForRumoring(
 	var newNeighbour, errN = n.getRangomNeighbour(exclNeighbors)
 	if errN != nil {
 		// If there are no more neighbours, return
-		log.Error().Msgf(
-			"[%s]:startPacketRumoring: Aborting %s",
-			n.conf.Socket.GetAddress(),
-			errN.Error())
+		//log.Error().Msgf(
+		//	"[%s]:startPacketRumoring: Aborting %s",
+		//	n.conf.Socket.GetAddress(),
+		//	errN.Error())
 		return transport.Packet{}, errN
 	}
 
@@ -392,11 +392,11 @@ func (n *node) startRumoring(
 			timer.Stop()
 			n.activeThreads.Done()
 			close(channel)
-			log.Info().Msgf("[%s]: RumorThread: stopped", n.conf.Socket.GetAddress())
+			//log.Info().Msgf("[%s]: RumorThread: stopped", n.conf.Socket.GetAddress())
 		}()
 		for n.getRunning() {
-			log.Info().Msgf("[%s]: RumorThread: started", n.conf.Socket.GetAddress())
-			log.Info().Msgf("[%s]: Sending w ack", n.conf.Socket.GetAddress())
+			//log.Info().Msgf("[%s]: RumorThread: started", n.conf.Socket.GetAddress())
+			//log.Info().Msgf("[%s]: Sending w ack", n.conf.Socket.GetAddress())
 			pkt, err := n.sendPktToRandomNeighbour(packet, exclNeighbors, true, channel)
 			if err != nil {
 				return
@@ -407,7 +407,7 @@ func (n *node) startRumoring(
 			case pair := <-channel:
 				var arrivedPkt, ackMsg = pair.Packet, pair.AckMessage
 				if ackMsg.AckedPacketID == packet.Header.PacketID {
-					log.Info().Msgf("[%s]: Recv ack from %s", n.conf.Socket.GetAddress(), arrivedPkt.Header.Source)
+					//log.Info().Msgf("[%s]: Recv ack from %s", n.conf.Socket.GetAddress(), arrivedPkt.Header.Source)
 					// Extract status msg and process it
 					statusMsg := ackMsg.Status
 					_ = n.processMsgByDummyPkt(
@@ -433,9 +433,9 @@ func (n *node) startRumoring(
 
 func (n *node) sendPktToRandomNeighbour(pkt transport.Packet, excludePeers []string,
 	needAck bool, channel chan struct {
-	transport.Packet
-	types.AckMessage
-}) (transport.Packet, error) {
+		transport.Packet
+		types.AckMessage
+	}) (transport.Packet, error) {
 	// Get random neighbour
 	packet, err := n.changePacketHeaderForRumoring(pkt, excludePeers)
 	if err != nil {

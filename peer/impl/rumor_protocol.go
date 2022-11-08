@@ -249,7 +249,7 @@ func (n *node) sendMessageAsRumor(msg transport.Message, excludeNeighbours []str
 
 func (n *node) sendAckForRumorPacket(pkt transport.Packet, statusMap map[string]uint) error {
 	// Get addresses
-	receivedFrom := pkt.Header.Source
+	receivedFrom := pkt.Header.RelayedBy
 	myAddress := n.conf.Socket.GetAddress()
 
 	// Craft ACK message
@@ -285,6 +285,9 @@ func (n *node) updateRoutingTableWithRumors(rumors []types.Rumor, relay string) 
 		src := rumor.Origin
 		var nextHop, ok = n.routingTable[src]
 		if !ok {
+			log.Info().Msgf("[%s]dest: %s: next hop: %s",
+				n.conf.Socket.GetAddress(),
+				src, relay)
 			n.routingTable[src] = relay
 			continue
 		}
@@ -293,6 +296,9 @@ func (n *node) updateRoutingTableWithRumors(rumors []types.Rumor, relay string) 
 			continue
 		}
 		n.routingTable[src] = relay
+		log.Info().Msgf("[%s]dest: %s: next hop: %s",
+			n.conf.Socket.GetAddress(),
+			src, relay)
 	}
 }
 
@@ -317,6 +323,9 @@ func (n *node) sendCatchUpRumors(rumors []types.Rumor, sendTo string) error {
 	}
 
 	// Send packet. We do not use routing table for catch-up
+	log.Info().Msgf("[%s] src: %s ** sending to: %s : via %s (3 ista)",
+		n.conf.Socket.GetAddress(), packet.Header.Source, packet.Header.Destination, packet.Header.RelayedBy,
+	)
 	errSend := n.conf.Socket.Send(sendTo, packet, TIMEOUT)
 	if errSend != nil {
 		log.Error().Msgf("[%s]: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
@@ -397,6 +406,7 @@ func (n *node) startRumoring(
 		for n.getRunning() {
 			//log.Info().Msgf("[%s]: RumorThread: started", n.conf.Socket.GetAddress())
 			//log.Info().Msgf("[%s]: Sending w ack", n.conf.Socket.GetAddress())
+
 			pkt, err := n.sendPktToRandomNeighbour(packet, exclNeighbors, true, channel)
 			if err != nil {
 				return
@@ -447,6 +457,9 @@ func (n *node) sendPktToRandomNeighbour(pkt transport.Packet, excludePeers []str
 		n.rumorInfo.registerRumorMessageForAck(packet, channel)
 	}
 	// Send the packet
+	log.Info().Msgf("[%s] src: %s ** sending to: %s : via %s",
+		n.conf.Socket.GetAddress(), packet.Header.Source, packet.Header.Destination, packet.Header.RelayedBy,
+	)
 	errSend := n.sendPkt(packet, TIMEOUT)
 	if errSend != nil {
 		if needAck {

@@ -272,7 +272,54 @@ func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Pac
 	}
 
 	if n.checkDuplicateAndRegister(*searchRequestMsg) {
+		log.Info().Msgf("[%s]: recID %s DUPLIUCATE | relayed from %s | req origin %s",
+			n.conf.Socket.GetAddress(), searchRequestMsg.RequestID,
+			pkt.Header.RelayedBy, searchRequestMsg.Origin)
 		return nil
+	}
+
+	// Update budget
+	budget := searchRequestMsg.Budget - 1
+
+	// Forward request
+	if budget > 0 {
+		var peers []string
+		var excludedPeers = []string{searchRequestMsg.Origin, pkt.Header.RelayedBy}
+		for uint(len(peers)) < budget {
+			peerAddress, errNeigh := n.getRangomNeighbour(excludedPeers)
+			if errNeigh != nil || peerAddress == "" {
+				break
+			}
+			peers = append(peers, peerAddress)
+			excludedPeers = append(excludedPeers, peerAddress)
+		}
+
+		for ind, peerAddress := range peers {
+			var peerBudget = budget / uint(len(peers))
+			if uint(ind) < budget%uint(len(peers)) {
+				peerBudget++
+			}
+			msg = types.SearchRequestMessage{
+				RequestID: searchRequestMsg.RequestID,
+				Budget:    peerBudget,
+				Pattern:   searchRequestMsg.Pattern,
+				Origin:    searchRequestMsg.Origin,
+			}
+
+			transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(msg)
+			if errCast != nil {
+				log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to marshall msg: %s",
+					n.conf.Socket.GetAddress(), errCast.Error())
+			}
+			log.Info().Msgf("[%s] Relay search from %s req to %s",
+				n.conf.Socket.GetAddress(), searchRequestMsg.Origin, peerAddress)
+			errSend := n.Unicast(peerAddress, transportMsg)
+			if errSend != nil {
+				log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send unicast: %s",
+					n.conf.Socket.GetAddress(), errSend.Error())
+			}
+
+		}
 	}
 
 	// Get filename by regex
@@ -324,47 +371,6 @@ func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Pac
 			n.conf.Socket.GetAddress(), errPkt.Error())
 	}
 
-	// Update budget
-	budget := searchRequestMsg.Budget - 1
-
-	// Forward request
-	if budget > 0 {
-		var peers []string
-		var excludedPeers = []string{searchRequestMsg.Origin}
-		for uint(len(peers)) < budget {
-			peerAddress, errNeigh := n.getRangomNeighbour(excludedPeers)
-			if errNeigh != nil || peerAddress == "" {
-				break
-			}
-			peers = append(peers, peerAddress)
-			excludedPeers = append(excludedPeers, peerAddress)
-		}
-
-		for ind, peerAddress := range peers {
-			var peerBudget = budget / uint(len(peers))
-			if uint(ind) < budget%uint(len(peers)) {
-				peerBudget++
-			}
-			msg = types.SearchRequestMessage{
-				RequestID: searchRequestMsg.RequestID,
-				Budget:    peerBudget,
-				Pattern:   searchRequestMsg.Pattern,
-				Origin:    searchRequestMsg.Origin,
-			}
-
-			transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(msg)
-			if errCast != nil {
-				log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to marshall msg: %s",
-					n.conf.Socket.GetAddress(), errCast.Error())
-			}
-			errSend := n.Unicast(peerAddress, transportMsg)
-			if errSend != nil {
-				log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send unicast: %s",
-					n.conf.Socket.GetAddress(), errSend.Error())
-			}
-
-		}
-	}
 	return nil
 }
 

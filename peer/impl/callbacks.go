@@ -260,6 +260,8 @@ func (n *node) dataReplyMessageCallback(msg types.Message, pkt transport.Packet)
 	if !ok {
 		return xerrors.Errorf("Failed to cast to DataReplyMessage message got wrong type: %T", msg)
 	}
+	log.Info().Msgf("[%s] received data reply from %s",
+		n.conf.Socket.GetAddress(), pkt.Header.Source)
 	n.processDataReply(*dataReplyMsg)
 	return nil
 }
@@ -283,6 +285,9 @@ func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Pac
 		n.forwardRequestToNeighbours(budget, *searchRequestMsg, pkt)
 	}
 	n.handleSearchRequestLocally(*searchRequestMsg, pkt)
+
+	log.Info().Msgf("[%s] sent reply for message request to %s",
+		n.conf.Socket.GetAddress(), pkt.Header.Source)
 	return nil
 }
 

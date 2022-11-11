@@ -6,6 +6,7 @@ import (
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
+	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 	"golang.org/x/xerrors"
 	"io"
@@ -186,7 +187,7 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 
 	// Initialize backoff mechanism
 	var duration = n.conf.BackoffDataRequest.Initial
-	var i uint = 0
+	var i uint
 	for i < n.conf.BackoffDataRequest.Retry {
 		// Send msg
 		errSend := n.Unicast(peerAddress, transportMessage)
@@ -199,10 +200,8 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 		case bytes := <-channel:
 			if bytes == nil {
 				return nil, xerrors.Errorf("Nil bytes received")
-			} else {
-				return bytes, nil
 			}
-
+			return bytes, nil
 		case <-time.After(duration):
 			duration = duration * time.Duration(
 				n.conf.BackoffDataRequest.Factor)
@@ -267,7 +266,6 @@ func (n *node) processDataReply(replyMsg types.DataReplyMessage) {
 	if ok {
 		channel <- replyMsg.Value
 	}
-	return
 }
 
 // Tag creates a mapping between a (file)name and a metahash.
@@ -366,20 +364,20 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (name
 	}
 
 	channel := make(chan string)
-	var list_ids []string
+	var listIds []string
 
 	defer func() {
-		n.unregisterFullyKnown(list_ids)
+		n.unregisterFullyKnown(listIds)
 		close(channel)
 	}()
 
 	initialBudget := conf.Initial
-	var cnt uint = 0
+	var cnt uint
 	for cnt < conf.Retry {
 
 		// Search remote peers
 		id := xid.New().String()
-		list_ids = append(list_ids, id)
+		listIds = append(listIds, id)
 		n.registerFullyKnown(id, channel)
 
 		// Send request search
@@ -420,7 +418,7 @@ func (n *node) sendSearchRequestRandomly(budget uint, id string, pattern regexp.
 	// Get matching names from remote peers
 	// Get matching names from remote peers
 	var peers []string
-	var counter uint = 0
+	var counter uint
 	for counter < budget {
 		peerAddress, errNeigh := n.getRangomNeighbour(peers)
 		if errNeigh != nil || peerAddress == "" {
@@ -538,4 +536,94 @@ func hashSHA256(data []byte) []byte {
 	sha256.Write(data)
 	hash := sha256.Sum(nil)
 	return hash
+}
+
+func (n *node) handleSearchRequestLocally(searchRequestMsg types.SearchRequestMessage, pkt transport.Packet) {
+
+	// Get filename by regex
+	localNames := n.getFilenamesFromLocalStorage()
+	var fileInfos []types.FileInfo
+	for _, name := range localNames {
+		matched, errMatch := regexp.MatchString(searchRequestMsg.Pattern, name)
+
+		if errMatch != nil {
+			continue
+		}
+		if matched {
+			metahash := string(n.conf.Storage.GetNamingStore().Get(name))
+			chunks := n.getHashesOfChunksForFile(metahash)
+			if chunks != nil {
+				fileInfo := types.FileInfo{
+					Name:     name,
+					Metahash: metahash,
+					Chunks:   chunks,
+				}
+				fileInfos = append(fileInfos, fileInfo)
+			}
+		}
+	}
+
+	// Create reply msg
+	replyMsg := types.SearchReplyMessage{
+		RequestID: searchRequestMsg.RequestID,
+		Responses: fileInfos,
+	}
+	// Convert to packet
+	packet, errPkt := n.msgTypesToPacket(
+		n.conf.Socket.GetAddress(),
+		n.conf.Socket.GetAddress(),
+		searchRequestMsg.Origin,
+		replyMsg)
+	if errPkt != nil {
+		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to craft packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error())
+	}
+	// Send packet
+	errSend := n.conf.Socket.Send(pkt.Header.Source, packet, TIMEOUT)
+	if errSend != nil {
+		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error())
+	}
+
+}
+
+func (n *node) forwardRequestToNeighbours(budget uint, searchRequestMsg types.SearchRequestMessage,
+	pkt transport.Packet) {
+	var peers []string
+	var excludedPeers = []string{searchRequestMsg.Origin, pkt.Header.RelayedBy}
+	for uint(len(peers)) < budget {
+		peerAddress, errNeigh := n.getRangomNeighbour(excludedPeers)
+		if errNeigh != nil || peerAddress == "" {
+			break
+		}
+		peers = append(peers, peerAddress)
+		excludedPeers = append(excludedPeers, peerAddress)
+	}
+
+	for ind, peerAddress := range peers {
+		var peerBudget = budget / uint(len(peers))
+		if uint(ind) < budget%uint(len(peers)) {
+			peerBudget++
+		}
+		var msg = types.SearchRequestMessage{
+			RequestID: searchRequestMsg.RequestID,
+			Budget:    peerBudget,
+			Pattern:   searchRequestMsg.Pattern,
+			Origin:    searchRequestMsg.Origin,
+		}
+		transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(msg)
+		if errCast != nil {
+			log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to marshall msg: %s",
+				n.conf.Socket.GetAddress(), errCast.Error())
+		}
+		log.Info().Msgf("[%s] Relay search from %s req to %s",
+			n.conf.Socket.GetAddress(), searchRequestMsg.Origin, peerAddress)
+		errSend := n.Unicast(peerAddress, transportMsg)
+		if errSend != nil {
+			log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send unicast: %s",
+				n.conf.Socket.GetAddress(), errSend.Error())
+		}
+
+	}
+
 }

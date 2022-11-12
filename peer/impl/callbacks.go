@@ -278,16 +278,16 @@ func (n *node) searchRequestMessageCallback(msg types.Message, pkt transport.Pac
 			pkt.Header.RelayedBy, searchRequestMsg.Origin)
 		return nil
 	}
+
+	n.handleSearchRequestLocally(*searchRequestMsg, pkt)
+	log.Info().Msgf("[%s] sent reply for message request to %s",
+		n.conf.Socket.GetAddress(), pkt.Header.Source)
 	// Update budget
 	budget := searchRequestMsg.Budget - 1
 	// Forward request
 	if budget > 0 {
 		n.forwardRequestToNeighbours(budget, *searchRequestMsg, pkt)
 	}
-	n.handleSearchRequestLocally(*searchRequestMsg, pkt)
-
-	log.Info().Msgf("[%s] sent reply for message request to %s",
-		n.conf.Socket.GetAddress(), pkt.Header.Source)
 	return nil
 }
 

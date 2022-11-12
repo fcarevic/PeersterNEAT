@@ -117,6 +117,9 @@ func (n *node) Upload(data io.Reader) (metahash string, err error) {
 
 		// If EOF, add to storage
 		metafileKey := hex.EncodeToString(hashSHA256(metafileKeyParts))
+		if uint(len([]byte(metafileValue))) > n.conf.ChunkSize {
+			return "", xerrors.Errorf("Metafile is larger than 1 chunk")
+		}
 		n.conf.Storage.GetDataBlobStore().Set(metafileKey, []byte(metafileValue))
 		return metafileKey, nil
 	}
@@ -128,6 +131,10 @@ func (n *node) Download(metahash string) ([]byte, error) {
 	metafileValueBytes, err := n.getValueForMetahash(metahash)
 	if err != nil {
 		return nil, err
+	}
+
+	if uint(len(metafileValueBytes)) > n.conf.ChunkSize {
+		return nil, xerrors.Errorf("Metafile is larger than 1 chunk")
 	}
 
 	// Extract parts of the file

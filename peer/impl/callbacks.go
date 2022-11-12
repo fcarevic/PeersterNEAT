@@ -262,7 +262,7 @@ func (n *node) dataReplyMessageCallback(msg types.Message, pkt transport.Packet)
 	}
 	log.Info().Msgf("[%s] received data reply from %s",
 		n.conf.Socket.GetAddress(), pkt.Header.Source)
-	n.processDataReply(*dataReplyMsg)
+	n.processDataReply(*dataReplyMsg, pkt)
 	return nil
 }
 

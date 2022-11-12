@@ -70,6 +70,21 @@ func (n *node) UpdateCatalog(key string, peer string) {
 	n.dataSharing.catalog[key] = peerMap
 }
 
+func (n *node) removeFromCatalog(src string, metahash string) {
+	// Acquire lock
+	n.dataSharing.catalogMutex.Lock()
+	defer n.dataSharing.catalogMutex.Unlock()
+
+	// Add to catalog
+	peerMap, ok := n.dataSharing.catalog[metahash]
+	if !ok {
+		return
+	}
+	delete(peerMap, src)
+	n.dataSharing.catalog[metahash] = peerMap
+
+}
+
 // Upload stores a new data blob on the peer and will make it available to
 // other peers. The blob will be split into chunks.
 func (n *node) Upload(data io.Reader) (metahash string, err error) {
@@ -267,7 +282,12 @@ func (n *node) unregisterDataRequestMessage(msg types.DataRequestMessage) {
 	}
 }
 
-func (n *node) processDataReply(replyMsg types.DataReplyMessage) {
+func (n *node) processDataReply(replyMsg types.DataReplyMessage, pkt transport.Packet) {
+
+	// Delete if empty
+	if replyMsg.Value == nil {
+		n.removeFromCatalog(pkt.Header.Source, replyMsg.Key)
+	}
 
 	// Acquire lock
 	n.dataSharing.dataRequestMapMutex.Lock()

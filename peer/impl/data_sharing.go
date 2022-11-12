@@ -73,6 +73,11 @@ func (n *node) UpdateCatalog(key string, peer string) {
 // Upload stores a new data blob on the peer and will make it available to
 // other peers. The blob will be split into chunks.
 func (n *node) Upload(data io.Reader) (metahash string, err error) {
+
+	if n.conf.ChunkSize == 0 {
+		return "", xerrors.Errorf("Chunk size cannot be zero")
+	}
+
 	// Initialize
 	var metafileValue string
 	var metafileKeyParts []byte

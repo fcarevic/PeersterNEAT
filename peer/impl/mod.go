@@ -42,6 +42,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			receivedRequests:           make(map[string]bool),
 			remoteFullyKnownMetahashes: make(map[string]chan string),
 		},
+		paxosInfo: PaxosInfo{
+			paxos: Paxos{},
+		},
 	}
 
 	// Add self-address to routing table
@@ -58,6 +61,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.DataReplyMessage{}, n.dataReplyMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.SearchRequestMessage{}, n.searchRequestMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.SearchReplyMessage{}, n.searchReplyMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosProposeMessage{}, n.paxosProposeMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosPrepareMessage{}, n.paxosPrepareMessageCallback)
 
 	return &n
 }
@@ -78,6 +83,9 @@ type node struct {
 
 	// Data sharing
 	dataSharing DataSharing
+
+	// Paxos
+	paxosInfo PaxosInfo
 
 	// Status flags
 	isRunning                   bool

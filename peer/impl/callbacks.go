@@ -331,3 +331,31 @@ func (n *node) searchReplyMessageCallback(msg types.Message, pkt transport.Packe
 
 	return nil
 }
+
+func (n *node) paxosPrepareMessageCallback(msg types.Message, pkt transport.Packet) error {
+	paxosPrepareMsg, ok := msg.(*types.PaxosPrepareMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to PaxosPrepareMessage message got wrong type: %T", msg)
+	}
+
+	// Check if message is expected
+	if !n.paxosInfo.paxos.isExpectedPaxosPrepareMsg(*paxosPrepareMsg) {
+		return nil
+	}
+	n.sendPaxosPromise(*paxosPrepareMsg)
+	return nil
+}
+
+func (n *node) paxosProposeMessageCallback(msg types.Message, pkt transport.Packet) error {
+	paxosProposeMsg, ok := msg.(*types.PaxosProposeMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to PaxosProposeMessage message got wrong type: %T", msg)
+	}
+
+	// Check if message is expected
+	if !n.paxosInfo.paxos.isExpectedPaxosProposeMsg(*paxosProposeMsg) {
+		return nil
+	}
+	n.broadcastPaxosAccept(*paxosProposeMsg)
+	return nil
+}

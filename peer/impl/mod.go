@@ -43,7 +43,10 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			remoteFullyKnownMetahashes: make(map[string]chan string),
 		},
 		paxosInfo: PaxosInfo{
-			paxos: Paxos{},
+			paxos: Paxos{
+				mapPaxosPrepareIDs: make(map[uint]chan PaxosToSend),
+				mapPaxosProposeIDs: make(map[uint]chan string),
+			},
 		},
 	}
 
@@ -63,6 +66,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.SearchReplyMessage{}, n.searchReplyMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosProposeMessage{}, n.paxosProposeMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosPrepareMessage{}, n.paxosPrepareMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosPromiseMessage{}, n.paxosPromiseMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
 
 	return &n
 }
@@ -274,10 +279,15 @@ func (n *node) Broadcast(msg transport.Message) error {
 		0)
 
 	// CAUTION! HERE WE PROCESS MESSAGE FROM FUNCTION ARGUMENT, NOT THE RumorMessage
-	var pkt = transport.Packet{Header: &header, Msg: &msg}
-	err := n.conf.MessageRegistry.ProcessPacket(pkt)
-	if err != nil {
-		log.Error().Msgf("%s: BROADCAST: Local message handling failed", n.conf.Socket.GetAddress())
-	}
+	n.activeThreads.Add(1)
+	go func() {
+		defer n.activeThreads.Done()
+		var pkt = transport.Packet{Header: &header, Msg: &msg}
+		err := n.conf.MessageRegistry.ProcessPacket(pkt)
+		if err != nil {
+			log.Error().Msgf("%s: BROADCAST: Local message handling failed", n.conf.Socket.GetAddress())
+		}
+	}()
+
 	return nil
 }

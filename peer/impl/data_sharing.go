@@ -302,6 +302,19 @@ func (n *node) processDataReply(replyMsg types.DataReplyMessage, pkt transport.P
 
 // Tag creates a mapping between a (file)name and a metahash.
 func (n *node) Tag(name string, mh string) error {
+
+	if n.conf.Storage.GetNamingStore().Get(name) != nil {
+		return xerrors.Errorf("Name already exist: %s", name)
+	}
+	if n.conf.TotalPeers > 1 {
+		if !n.runConsensus(types.PaxosValue{
+			UniqID:   xid.New().String(),
+			Metahash: mh,
+			Filename: name,
+		}) {
+			return nil
+		}
+	}
 	n.conf.Storage.GetNamingStore().Set(name, []byte(mh))
 	return nil
 }

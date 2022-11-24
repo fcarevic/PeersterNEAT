@@ -3,7 +3,15 @@ package impl
 import (
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/types"
+	"golang.org/x/xerrors"
 	"sync"
+	"time"
+)
+
+const (
+	PAXOS_INIT   = 0
+	PAXOS_PHASE1 = 1
+	PAXOS_PHASE2 = 2
 )
 
 type PaxosInfo struct {
@@ -18,19 +26,47 @@ type PaxosInfo struct {
 	paxosInfoMutex sync.Mutex
 }
 
+type PaxosToSend struct {
+	id    uint
+	value *types.PaxosValue
+}
+
 type Paxos struct {
 
 	// Counters
 	clockStep uint
 	maxID     uint
 
+	// Map of channels for IDs
+	mapPaxosPrepareIDs map[uint]chan PaxosToSend
+	mapPaxosProposeIDs map[uint]chan string
+
+	// Field used only for the proposer
+	phase uint
+
 	// Accepted msg
 	acceptedID    uint
 	acceptedValue *types.PaxosValue
 
 	// Semaphores
-	paxosMutex      sync.Mutex
-	acceptSemaphore sync.Mutex
+	paxosMutex              sync.Mutex
+	mapPaxosPrepareIDsMutex sync.Mutex
+	acceptSemaphore         sync.Mutex
+	mapPaxosProposeIDsMutex sync.Mutex
+}
+
+func (p *PaxosInfo) getGlobalClockStep() uint {
+	// Acquire lock
+	p.paxosInfoMutex.Lock()
+	defer p.paxosInfoMutex.Unlock()
+	return p.globalClockStep
+}
+
+func (p *PaxosInfo) incrementGlobalClockStep() {
+	// Acquire lock
+	p.paxosInfoMutex.Lock()
+	defer p.paxosInfoMutex.Unlock()
+	p.globalClockStep = p.globalClockStep + 1
 }
 
 func (p *Paxos) isExpectedPaxosPrepareMsg(paxosPrepareMsg types.PaxosPrepareMessage) bool {
@@ -44,6 +80,14 @@ func (p *Paxos) isExpectedPaxosPrepareMsg(paxosPrepareMsg types.PaxosPrepareMess
 	return check
 }
 
+func (p *Paxos) isExpectedPaxosPromiseMsg(paxosPromiseMsg types.PaxosPromiseMessage) bool {
+	// Acquire lock
+	p.paxosMutex.Lock()
+	defer p.paxosMutex.Unlock()
+	check := paxosPromiseMsg.Step == p.clockStep && p.phase == PAXOS_PHASE1
+	return check
+}
+
 func (p *Paxos) isExpectedPaxosProposeMsg(paxosProposeMsg types.PaxosProposeMessage) bool {
 	// Acquire lock
 	p.paxosMutex.Lock()
@@ -51,11 +95,89 @@ func (p *Paxos) isExpectedPaxosProposeMsg(paxosProposeMsg types.PaxosProposeMess
 	return paxosProposeMsg.Step == p.clockStep && paxosProposeMsg.ID == p.maxID
 }
 
+func (p *Paxos) isExpectedPaxosAcceptMsg(paxosAcceptMsg types.PaxosAcceptMessage) bool {
+	// Acquire lock
+	p.paxosMutex.Lock()
+	defer p.paxosMutex.Unlock()
+	return paxosAcceptMsg.Step == p.clockStep && p.phase == PAXOS_PHASE2
+}
+
 func (p *Paxos) getAcceptedValue() (uint, *types.PaxosValue) {
 	// Acquire lock
 	p.acceptSemaphore.Lock()
 	defer p.acceptSemaphore.Unlock()
 	return p.acceptedID, p.acceptedValue
+}
+
+func (p *Paxos) getPhase() uint {
+	// Acquire lock
+	p.paxosMutex.Lock()
+	defer p.paxosMutex.Unlock()
+	return p.phase
+}
+func (p *Paxos) setPhase(phase uint) {
+	// Acquire lock
+	p.paxosMutex.Lock()
+	defer p.paxosMutex.Unlock()
+	p.phase = phase
+}
+func (p *Paxos) registerPreparePaxosID(id uint, channel chan PaxosToSend) {
+	// Acquire lock
+	p.mapPaxosPrepareIDsMutex.Lock()
+	defer p.mapPaxosPrepareIDsMutex.Unlock()
+	p.mapPaxosPrepareIDs[id] = channel
+}
+
+func (p *Paxos) unregisterPreparePaxosID(id uint) {
+	// Acquire lock
+	p.mapPaxosPrepareIDsMutex.Lock()
+	defer p.mapPaxosPrepareIDsMutex.Unlock()
+	delete(p.mapPaxosPrepareIDs, id)
+}
+
+func (p *Paxos) notifyPreparePaxosID(id uint, toSend PaxosToSend) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error().Msgf("notifyPaxosID: Panic on sending on the channel")
+		}
+	}()
+	// Acquire lock
+	p.mapPaxosPrepareIDsMutex.Lock()
+	channel, ok := p.mapPaxosPrepareIDs[id]
+	p.mapPaxosPrepareIDsMutex.Unlock()
+	if ok {
+		log.Info().Msgf("received notification for ID: %d", id)
+		channel <- toSend
+	}
+}
+
+func (p *Paxos) registerProposePaxosID(id uint, channel chan string) {
+	// Acquire lock
+	p.mapPaxosProposeIDsMutex.Lock()
+	defer p.mapPaxosProposeIDsMutex.Unlock()
+	p.mapPaxosProposeIDs[id] = channel
+}
+func (p *Paxos) unregisterProposePaxosID(id uint) {
+	// Acquire lock
+	p.mapPaxosProposeIDsMutex.Lock()
+	defer p.mapPaxosProposeIDsMutex.Unlock()
+	delete(p.mapPaxosProposeIDs, id)
+}
+
+func (p *Paxos) notifyProposePaxosID(id uint) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error().Msgf("notifyPaxosID: Panic on sending on the channel")
+		}
+	}()
+	// Acquire lock
+	p.mapPaxosProposeIDsMutex.Lock()
+	channel, ok := p.mapPaxosProposeIDs[id]
+	p.mapPaxosProposeIDsMutex.Unlock()
+
+	if ok {
+		channel <- "notify"
+	}
 }
 
 func (p *Paxos) setAcceptedValue(id uint, acceptedValue types.PaxosValue) {
@@ -138,5 +260,170 @@ func (n *node) sendPaxosPromise(paxosPrepareMsg types.PaxosPrepareMessage) {
 		log.Error().Msgf("[%s]: sendPaxosPromise: Broadcasting falied:  %s",
 			n.conf.Socket.GetAddress(), errBroadcast.Error())
 		return
+	}
+}
+
+func (n *node) sendPrepareMessage(step uint, id *uint) (bool, PaxosToSend) {
+
+	//  TODO: Change for multi-paxos
+	var i uint
+	retVal := PaxosToSend{}
+	channel := make(chan PaxosToSend)
+
+	defer func() {
+		close(channel)
+		n.paxosInfo.paxos.unregisterPreparePaxosID(*id)
+	}()
+
+	for {
+		log.Info().Msgf("[%s] HERE6", n.conf.Socket.GetAddress())
+		// Init counters for iteration
+		var cntAccepts int
+
+		// Get ID  and register channel
+		*id = n.conf.PaxosID + i*n.conf.TotalPeers
+		retVal.id = *id
+		n.paxosInfo.paxos.registerPreparePaxosID(*id, channel)
+
+		// craft Message
+		paxosPrepareMessage := types.PaxosPrepareMessage{
+			Step:   step,
+			ID:     *id,
+			Source: n.conf.Socket.GetAddress(),
+		}
+
+		// Marshall message
+		transportMsg, err := n.conf.MessageRegistry.MarshalMessage(paxosPrepareMessage)
+		if err != nil {
+			log.Error().Msgf("[%s]: sendPrepareMessage: Error marshalling: %s",
+				n.conf.Socket.GetAddress(), err.Error())
+			return false, PaxosToSend{}
+		}
+
+		log.Info().Msgf("[%s] HERE4", n.conf.Socket.GetAddress())
+
+		// Broadcast
+		errBroadcast := n.Broadcast(transportMsg)
+		log.Info().Msgf("[%s] HERE11", n.conf.Socket.GetAddress())
+		if errBroadcast != nil {
+			log.Error().Msgf("[%s]: sendPrepareMessage: Broadcast failed: %s",
+				n.conf.Socket.GetAddress(), errBroadcast.Error())
+			// TODO: what happens here??
+			return false, PaxosToSend{}
+		}
+		log.Info().Msgf("[%s] HERE1", n.conf.Socket.GetAddress())
+		flag := false
+		for !flag {
+			select {
+			case acc := <-channel:
+				log.Info().Msgf("[%s] HERE", n.conf.Socket.GetAddress())
+				if (acc.value != nil && retVal.value == nil) || (acc.id > retVal.id) {
+					retVal.id = acc.id
+					retVal.value = acc.value
+				}
+				cntAccepts++
+				log.Info().Msgf("[%s] ack received promise in sendPrepare", n.conf.Socket.GetAddress())
+				if cntAccepts >= n.conf.PaxosThreshold(n.conf.TotalPeers) {
+					n.paxosInfo.paxos.setPhase(PAXOS_PHASE2)
+					return true, retVal
+				}
+				break
+			case <-n.notifyEnd:
+				return false, PaxosToSend{}
+
+			case <-time.After(n.conf.PaxosProposerRetry):
+				n.paxosInfo.paxos.unregisterPreparePaxosID(*id)
+				log.Info().Msgf("[%s] Timeout", n.conf.Socket.GetAddress())
+				flag = true
+				break
+			}
+		}
+		i++
+	}
+}
+
+func (n *node) sendProposeMsg(toSend PaxosToSend, step uint) (bool, error) {
+
+	// Craft Message
+	// TODO: WHICH ID DO YOU PUT HERE?? ACCEPTED ID OR YOUR ORIGINAL ID?
+	proposeMsg := types.PaxosProposeMessage{
+		Step:  step,
+		ID:    toSend.id,
+		Value: *toSend.value,
+	}
+
+	// Marshall
+	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(proposeMsg)
+	if errMarshall != nil {
+		log.Error().Msgf("[%s]: sendProposeMsg: Error marshalling: %s",
+			n.conf.Socket.GetAddress(), errMarshall.Error())
+		return false, errMarshall
+	}
+
+	// Broadcast
+	errBroadcast := n.Broadcast(transportMsg)
+	if errBroadcast != nil {
+		log.Error().Msgf("[%s]: sendProposeMsg: Broadcast failed: %s",
+			n.conf.Socket.GetAddress(), errBroadcast.Error())
+		// TODO: what happens here??
+		return false, errBroadcast
+	}
+
+	cnt := 0
+	channel := make(chan string)
+	n.paxosInfo.paxos.registerProposePaxosID(toSend.id, channel)
+
+	defer func() {
+		n.paxosInfo.paxos.unregisterProposePaxosID(toSend.id)
+		close(channel)
+	}()
+
+	for {
+		select {
+		case <-channel:
+			cnt++
+			//TODO: ADD CHECK FOR UNIQUE LIST OF ACCEPTS??? FIND UNIQUE LIST OF WHAT IS SUPPOSED IN THE HW3!
+			if cnt >= n.conf.PaxosThreshold(n.conf.TotalPeers) {
+				return true, nil
+			}
+			break
+		case <-n.notifyEnd:
+			return false, xerrors.Errorf("END")
+		case <-time.After(n.conf.PaxosProposerRetry):
+			return false, nil
+
+		}
+	}
+}
+
+func (n *node) runConsensus(value types.PaxosValue) bool {
+	var id uint
+	step := n.paxosInfo.getGlobalClockStep()
+	// Send prepare
+	for {
+		log.Info().Msgf("[%s]: runConsensus: before first paxos phase", n.conf.Socket.GetAddress())
+		n.paxosInfo.paxos.setPhase(PAXOS_PHASE1)
+		sucess, toSend := n.sendPrepareMessage(step, &id)
+		if !sucess {
+			n.paxosInfo.paxos.setPhase(PAXOS_INIT)
+			return false
+		}
+		n.paxosInfo.paxos.setPhase(PAXOS_PHASE2)
+		if toSend.value == nil {
+			toSend.value = &value
+		}
+		log.Info().Msgf("[%s]: runConsensus: before second paxos phase", n.conf.Socket.GetAddress())
+		sucessPropose, errPropose := n.sendProposeMsg(toSend, step)
+
+		if errPropose != nil {
+			log.Info().Msgf("[%s]: runConsensus: finished with error", n.conf.Socket.GetAddress())
+			return false
+		}
+		if errPropose == nil && sucessPropose {
+			n.paxosInfo.paxos.setPhase(PAXOS_INIT)
+			log.Info().Msgf("[%s]: runConsensus: paxos finished", n.conf.Socket.GetAddress())
+			return true
+		}
+		n.paxosInfo.paxos.setPhase(PAXOS_PHASE1)
 	}
 }

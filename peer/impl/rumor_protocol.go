@@ -323,9 +323,6 @@ func (n *node) sendCatchUpRumors(rumors []types.Rumor, sendTo string) error {
 	}
 
 	// Send packet. We do not use routing table for catch-up
-	log.Info().Msgf("[%s] src: %s ** sending to: %s : via %s (3 ista)",
-		n.conf.Socket.GetAddress(), packet.Header.Source, packet.Header.Destination, packet.Header.RelayedBy,
-	)
 	errSend := n.conf.Socket.Send(sendTo, packet, TIMEOUT)
 	if errSend != nil {
 		log.Error().Msgf("[%s]: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
@@ -457,9 +454,6 @@ func (n *node) sendPktToRandomNeighbour(pkt transport.Packet, excludePeers []str
 		n.rumorInfo.registerRumorMessageForAck(packet, channel)
 	}
 	// Send the packet
-	log.Info().Msgf("[%s] src: %s ** sending to: %s : via %s",
-		n.conf.Socket.GetAddress(), packet.Header.Source, packet.Header.Destination, packet.Header.RelayedBy,
-	)
 	errSend := n.sendPkt(packet, TIMEOUT)
 	if errSend != nil {
 		if needAck {

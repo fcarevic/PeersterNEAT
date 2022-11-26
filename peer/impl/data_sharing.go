@@ -303,20 +303,47 @@ func (n *node) processDataReply(replyMsg types.DataReplyMessage, pkt transport.P
 // Tag creates a mapping between a (file)name and a metahash.
 func (n *node) Tag(name string, mh string) error {
 
-	if n.conf.Storage.GetNamingStore().Get(name) != nil {
-		return xerrors.Errorf("Name already exist: %s", name)
-	}
 	if n.conf.TotalPeers > 1 {
-		if !n.runConsensus(types.PaxosValue{
-			UniqID:   xid.New().String(),
-			Metahash: mh,
-			Filename: name,
-		}) {
-			return nil
+		consensusReached := false
+		for !consensusReached {
+			if n.conf.Storage.GetNamingStore().Get(name) != nil {
+				return xerrors.Errorf("Name already exist: %s", name)
+			}
+
+			// Wait for the turn
+			running, channel := n.paxosInfo.paxos.isProposerRunning()
+			if running {
+				select {
+				case <-n.notifyEnd:
+					return nil
+				case <-channel:
+					continue
+				}
+			}
+
+			errCons, status := n.runConsensus(types.PaxosValue{
+				UniqID:   xid.New().String(),
+				Metahash: mh,
+				Filename: name,
+			})
+
+			switch status {
+			case PROPOSER_STOP_NODE:
+				return nil
+			case PROPOSER_OUR_VALUE:
+				n.paxosInfo.paxos.notifySuccessfulConsensus()
+				consensusReached = true
+				break
+			case PROPOSER_ERROR:
+				return errCons
+			}
 		}
+		return nil
+	} else {
+		n.conf.Storage.GetNamingStore().Set(name, []byte(mh))
+		return nil
 	}
-	n.conf.Storage.GetNamingStore().Set(name, []byte(mh))
-	return nil
+
 }
 
 // Resolve returns the corresponding metahash of a given (file)name. Returns

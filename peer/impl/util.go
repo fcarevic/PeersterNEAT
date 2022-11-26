@@ -4,6 +4,7 @@ import (
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 	"sort"
+	"strconv"
 )
 
 // TTL Define const
@@ -71,4 +72,17 @@ func sortRumors(rumors []types.Rumor) []types.Rumor {
 		return rumors[i].Sequence < rumors[j].Sequence
 	})
 	return rumors
+}
+
+func createBlockchainBlock(step uint, previousHash string, value types.PaxosValue) types.BlockchainBlock {
+	str := strconv.Itoa(int(step)) + value.UniqID + value.Filename + value.Metahash + previousHash
+	hash := hashSHA256([]byte(str))
+	block := types.BlockchainBlock{
+		Index:    step,
+		Value:    value,
+		PrevHash: []byte(previousHash),
+		Hash:     hash,
+	}
+
+	return block
 }

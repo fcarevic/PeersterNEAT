@@ -400,6 +400,20 @@ func (n *node) paxosAcceptMessageCallback(msg types.Message, pkt transport.Packe
 	log.Info().Msgf("[%s] received accept from %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
 	// TODO: what if accepted id is different?
 	id := paxosAcceptMsg.ID
-	n.paxosInfo.paxos.notifyProposePaxosID(id)
+	n.paxosInfo.paxos.notifyProposePaxosID(id, *paxosAcceptMsg)
+	return nil
+}
+
+func (n *node) tlcMessageCallback(msg types.Message, pkt transport.Packet) error {
+	tlcMsg, ok := msg.(*types.TLCMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to TLCMessage message got wrong type: %T", msg)
+	}
+
+	// Check if message is expected
+	n.handleTlCMsg(*tlcMsg)
+
+	log.Info().Msgf("[%s] received tlcMsg from %s: step %d , filename: %s ", n.conf.Socket.GetAddress(),
+		pkt.Header.Source, tlcMsg.Step, tlcMsg.Block.Value.Filename)
 	return nil
 }

@@ -44,9 +44,14 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		},
 		paxosInfo: PaxosInfo{
 			paxos: Paxos{
-				mapPaxosPrepareIDs: make(map[uint]chan PaxosToSend),
-				mapPaxosProposeIDs: make(map[uint]chan string),
+				mapPaxosPrepareIDs:   make(map[uint]chan PaxosToSend),
+				mapPaxosProposeIDs:   make(map[uint]chan types.PaxosAcceptMessage),
+				notifyEndOfClockStep: make(chan string),
+				channelSuccCons:      make(chan string),
 			},
+		},
+		tlcInfo: TLCInfo{
+			mapStepListTLCMsg: make(map[uint][]types.TLCMessage),
 		},
 	}
 
@@ -68,6 +73,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosPrepareMessage{}, n.paxosPrepareMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosPromiseMessage{}, n.paxosPromiseMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
 
 	return &n
 }
@@ -91,6 +97,9 @@ type node struct {
 
 	// Paxos
 	paxosInfo PaxosInfo
+
+	// TLC
+	tlcInfo TLCInfo
 
 	// Status flags
 	isRunning                   bool

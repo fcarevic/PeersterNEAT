@@ -46,6 +46,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			paxos: Paxos{
 				mapPaxosPrepareIDs:   make(map[uint]chan PaxosToSend),
 				mapPaxosProposeIDs:   make(map[uint]chan types.PaxosAcceptMessage),
+				mapPaxosAcceptIDs:    make(map[uint][]types.PaxosAcceptMessage),
 				notifyEndOfClockStep: make(chan string),
 				channelSuccCons:      make(chan string),
 			},

@@ -49,6 +49,7 @@ type Paxos struct {
 	// Map of channels for IDs
 	mapPaxosPrepareIDs   map[uint]chan PaxosToSend
 	mapPaxosProposeIDs   map[uint]chan types.PaxosAcceptMessage
+	mapPaxosAcceptIDs    map[uint][]types.PaxosAcceptMessage
 	notifyEndOfClockStep chan string
 	channelSuccCons      chan string
 
@@ -105,15 +106,18 @@ func (p *Paxos) resetPaxos(clockStep uint) {
 	p.notifyEndOfClockStep = make(chan string, 5000)
 
 	// Reset maps
-	for key, channel := range p.mapPaxosProposeIDs {
-		close(channel)
+	for key := range p.mapPaxosProposeIDs {
+		//close(channel)
 		delete(p.mapPaxosProposeIDs, key)
 	}
 
 	// Delete all prepares
-	for key, channel := range p.mapPaxosPrepareIDs {
-		close(channel)
+	for key := range p.mapPaxosPrepareIDs {
 		delete(p.mapPaxosPrepareIDs, key)
+	}
+	// Del all accepts
+	for key, _ := range p.mapPaxosAcceptIDs {
+		delete(p.mapPaxosAcceptIDs, key)
 	}
 }
 func (p *Paxos) isExpectedPaxosPrepareMsg(paxosPrepareMsg types.PaxosPrepareMessage) bool {
@@ -146,7 +150,7 @@ func (p *Paxos) isExpectedPaxosAcceptMsg(paxosAcceptMsg types.PaxosAcceptMessage
 	// Acquire lock
 	p.paxosMutex.Lock()
 	defer p.paxosMutex.Unlock()
-	return paxosAcceptMsg.Step == p.clockStep && p.phase == PAXOS_PHASE2
+	return paxosAcceptMsg.Step == p.clockStep && p.phase != PAXOS_PHASE1
 }
 
 func (p *Paxos) getAcceptedValue() (uint, *types.PaxosValue) {
@@ -210,15 +214,27 @@ func (p *Paxos) unregisterProposePaxosID(id uint) {
 	delete(p.mapPaxosProposeIDs, id)
 }
 
-func (p *Paxos) notifyProposePaxosID(id uint, acceptMsg types.PaxosAcceptMessage) {
+func (n *node) notifyProposePaxosID(id uint, acceptMsg types.PaxosAcceptMessage) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Error().Msgf("notifyPaxosID: Panic on sending on the channel")
 		}
 	}()
 	// Acquire lock
+	p := n.paxosInfo.paxos
 	p.mapPaxosProposeIDsMutex.Lock()
 	channel, ok := p.mapPaxosProposeIDs[id]
+
+	// Handle accept msg
+	list, exist := p.mapPaxosAcceptIDs[id]
+	if !exist {
+		list = make([]types.PaxosAcceptMessage, 0)
+	}
+	list = append(list, acceptMsg)
+	p.mapPaxosAcceptIDs[id] = list
+	if len(list) >= n.conf.PaxosThreshold(n.conf.TotalPeers) {
+		n.broadcastTLCMessage(createBlockchainBlock(acceptMsg.Step, n.getPreviousHash(), acceptMsg.Value))
+	}
 	p.mapPaxosProposeIDsMutex.Unlock()
 
 	if ok {
@@ -316,10 +332,10 @@ func (n *node) sendPrepareMessage(step uint, id *uint) (error, int, PaxosToSend)
 	retVal := PaxosToSend{}
 	channel := make(chan PaxosToSend)
 
-	defer func() {
+	defer func(channel chan PaxosToSend, n *node) {
 		close(channel)
 		n.paxosInfo.paxos.unregisterPreparePaxosID(*id)
-	}()
+	}(channel, n)
 
 	for {
 		// Init counters for iteration
@@ -416,10 +432,10 @@ func (n *node) sendProposeMsg(toSend PaxosToSend, step uint) (error, int, *types
 	n.paxosInfo.paxos.registerProposePaxosID(toSend.id, channel)
 	receivedAccepts := make(map[string][]types.PaxosValue)
 
-	defer func() {
+	defer func(toSend PaxosToSend, n *node, channel chan types.PaxosAcceptMessage) {
 		n.paxosInfo.paxos.unregisterProposePaxosID(toSend.id)
 		close(channel)
-	}()
+	}(toSend, n, channel)
 
 	for {
 		select {
@@ -489,8 +505,8 @@ func (n *node) runConsensus(value types.PaxosValue) (error, int) {
 		}
 		n.paxosInfo.paxos.setPhase(PAXOS_INIT)
 		log.Info().Msgf("[%s]: runConsensus: paxos finished", n.conf.Socket.GetAddress())
-		n.broadcastTLCMessage(createBlockchainBlock(n.paxosInfo.getGlobalClockStep(),
-			n.getPreviousHash(), *acceptedValue))
+		//n.broadcastTLCMessage(createBlockchainBlock(n.paxosInfo.getGlobalClockStep(),
+		//	n.getPreviousHash(), *acceptedValue))
 		isOurValue := value.Metahash == acceptedValue.Metahash && value.Filename == acceptedValue.Filename
 		if isOurValue {
 			return nil, PROPOSER_OUR_VALUE
@@ -508,14 +524,15 @@ func (p *Paxos) notifySuccessfulConsensus() {
 	p.channelSuccCons = make(chan string)
 }
 
-func (p *Paxos) isProposerRunning() (bool, chan string) {
+func (p *Paxos) isProposerRunning() bool {
 	p.paxosMutex.Lock()
 	defer p.paxosMutex.Unlock()
-	if p.proposerRunning {
-		return true, p.channelSuccCons
-	}
-	p.proposerRunning = true
-	return false, p.channelSuccCons
+	//if p.proposerRunning {
+	//	return true, p.channelSuccCons
+	//}
+	//p.proposerRunning = true
+	//return false, p.channelSuccCons
+	return p.proposerRunning
 }
 
 func (n *node) getPreviousHash() string {

@@ -65,6 +65,10 @@ func (t *TLCInfo) getFirstBlockForCurrentStepUnsafe() (error, types.BlockchainBl
 }
 
 func (n *node) isTLCConsensusReachedUnsafe() bool {
+	log.Info().Msgf("[%s] num: %d, thresh: %d , steps: %d %d", n.conf.Socket.GetAddress(),
+		n.tlcInfo.getNumberOfTLCMessagesForCurrentUnsafe(),
+		n.conf.PaxosThreshold(n.conf.TotalPeers),
+		n.tlcInfo.globalClockStep, n.paxosInfo.getGlobalClockStep())
 	return n.tlcInfo.getNumberOfTLCMessagesForCurrentUnsafe() >= n.conf.PaxosThreshold(n.conf.TotalPeers) &&
 		n.tlcInfo.globalClockStep == n.paxosInfo.getGlobalClockStep()
 }
@@ -78,9 +82,11 @@ func (n *node) handleTlCMsg(tlcMsg types.TLCMessage) {
 	if !n.tlcInfo.addTLCMsgUnsafe(tlcMsg) {
 		return
 	}
+	log.Info().Msgf("[%s] TLC Message added", n.conf.Socket.GetAddress())
 
 	//check if consensus reached
 	if n.isTLCConsensusReachedUnsafe() {
+		log.Info().Msgf("[%s] TLC consensus reached", n.conf.Socket.GetAddress())
 		err, block := n.tlcInfo.getFirstBlockForCurrentStepUnsafe()
 		if err != nil {
 			return
@@ -124,7 +130,7 @@ func (n *node) tlcCatchUpUnsafe() {
 	}
 }
 func (n *node) broadcastTLCMessageUnsafe(block types.BlockchainBlock) {
-	if n.tlcInfo.hasBroadcasted {
+	if n.tlcInfo.hasBroadcasted || block.Index != n.tlcInfo.globalClockStep {
 		return
 	}
 	n.tlcInfo.hasBroadcasted = true

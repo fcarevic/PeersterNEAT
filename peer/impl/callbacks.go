@@ -400,7 +400,7 @@ func (n *node) paxosAcceptMessageCallback(msg types.Message, pkt transport.Packe
 	log.Info().Msgf("[%s] received accept from %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
 	// TODO: what if accepted id is different?
 	id := paxosAcceptMsg.ID
-	n.paxosInfo.paxos.notifyProposePaxosID(id, *paxosAcceptMsg)
+	n.notifyProposePaxosID(id, *paxosAcceptMsg)
 	return nil
 }
 

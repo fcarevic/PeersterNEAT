@@ -339,12 +339,8 @@ func (n *node) paxosPrepareMessageCallback(msg types.Message, pkt transport.Pack
 	}
 
 	// Check if message is expected
-	if !n.paxosInfo.paxos.isExpectedPaxosPrepareMsg(*paxosPrepareMsg) {
-		return nil
-	}
-
+	n.processPaxosPrepareMsg(*paxosPrepareMsg)
 	log.Info().Msgf("[%s] received prepare from %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
-	n.sendPaxosPromise(*paxosPrepareMsg)
 	return nil
 }
 
@@ -355,11 +351,9 @@ func (n *node) paxosProposeMessageCallback(msg types.Message, pkt transport.Pack
 	}
 
 	// Check if message is expected
-	if !n.paxosInfo.paxos.isExpectedPaxosProposeMsg(*paxosProposeMsg) {
-		return nil
-	}
+	n.processPaxosProposeMsg(*paxosProposeMsg)
 	log.Info().Msgf("[%s] received propose from %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
-	n.broadcastPaxosAccept(*paxosProposeMsg)
+
 	return nil
 }
 
@@ -370,19 +364,8 @@ func (n *node) paxosPromiseMessageCallback(msg types.Message, pkt transport.Pack
 	}
 
 	// Check if message is expected
-	if !n.paxosInfo.paxos.isExpectedPaxosPromiseMsg(*paxosPromiseMsg) {
-		return nil
-	}
+	n.processPaxosPromiseMsg(*paxosPromiseMsg)
 	log.Info().Msgf("[%s] received promise from %s for ID:%d   step: %d", n.conf.Socket.GetAddress(), pkt.Header.Source, paxosPromiseMsg.ID, paxosPromiseMsg.Step)
-
-	// TODO: what if accepted id is different?
-	id := paxosPromiseMsg.ID
-	acceptedValue := PaxosToSend{id: id, value: nil}
-	if paxosPromiseMsg.AcceptedValue != nil {
-		acceptedValue.id = paxosPromiseMsg.AcceptedID
-		acceptedValue.value = paxosPromiseMsg.AcceptedValue
-	}
-	n.paxosInfo.paxos.notifyPreparePaxosID(id, acceptedValue)
 	return nil
 }
 
@@ -393,14 +376,9 @@ func (n *node) paxosAcceptMessageCallback(msg types.Message, pkt transport.Packe
 	}
 
 	// Check if message is expected
-	if !n.paxosInfo.paxos.isExpectedPaxosAcceptMsg(*paxosAcceptMsg) {
-		return nil
-	}
+	n.processPaxosAcceptMsg(*paxosAcceptMsg, pkt)
 
-	log.Info().Msgf("[%s] received accept from %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
 	// TODO: what if accepted id is different?
-	id := paxosAcceptMsg.ID
-	n.notifyProposePaxosID(id, *paxosAcceptMsg)
 	return nil
 }
 

@@ -1545,6 +1545,7 @@ func Test_HW3_Tag_Paxos_Consensus_Stress_Test(t *testing.T) {
 
 	// > all peers must have the same last hash
 	require.Len(t, lastHashes, 1)
+	log.Info().Msgf("Test finished")
 }
 
 // -----------------------------------------------------------------------------

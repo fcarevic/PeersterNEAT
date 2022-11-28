@@ -42,7 +42,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			receivedRequests:           make(map[string]bool),
 			remoteFullyKnownMetahashes: make(map[string]chan string),
 		},
-		paxosInfo: PaxosInfo{
+		multiPaxos: MultiPaxos{
 			paxos: Paxos{
 				mapPaxosPrepareIDs:   make(map[uint]chan PaxosToSend),
 				mapPaxosProposeIDs:   make(map[uint]chan types.PaxosAcceptMessage),
@@ -50,9 +50,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 				notifyEndOfClockStep: make(chan string),
 				channelSuccCons:      make(chan string),
 			},
-		},
-		tlcInfo: TLCInfo{
-			mapStepListTLCMsg: make(map[uint][]types.TLCMessage),
+			tlc: TLCInfo{
+				mapStepListTLCMsg: make(map[uint][]types.TLCMessage),
+			},
 		},
 	}
 
@@ -97,10 +97,7 @@ type node struct {
 	dataSharing DataSharing
 
 	// Paxos
-	paxosInfo PaxosInfo
-
-	// TLC
-	tlcInfo TLCInfo
+	multiPaxos MultiPaxos
 
 	// Status flags
 	isRunning                   bool
@@ -171,7 +168,7 @@ func (n *node) Stop() error {
 	n.startStopMutex.Unlock()
 	log.Info().Msgf("[%s] Waiting for threads to be done", n.conf.Socket.GetAddress())
 	// Wait for all threads to finish
-	//n.activeThreads.Wait()
+	n.activeThreads.Wait()
 	log.Info().Msgf("[%s] Exited", n.conf.Socket.GetAddress())
 	return nil
 }

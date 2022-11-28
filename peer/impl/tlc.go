@@ -12,7 +12,6 @@ import (
 type TLCInfo struct {
 
 	// Attributes
-	globalClockStep   uint
 	mapStepListTLCMsg map[uint][]types.TLCMessage
 	hasBroadcasted    bool
 
@@ -20,41 +19,36 @@ type TLCInfo struct {
 	tlcMutex sync.Mutex
 }
 
-func (t *TLCInfo) nextStepUnsafe() {
-	delete(t.mapStepListTLCMsg, t.globalClockStep)
-	t.globalClockStep += 1
-	t.hasBroadcasted = false
-
+func (p *MultiPaxos) nextTLCStepUnsafe() {
+	// Clock step is already incremented!
+	delete(p.tlc.mapStepListTLCMsg, p.globalClockStep-1)
+	p.tlc.hasBroadcasted = false
 }
 
-func (n *node) nextTLCStep() {
-	n.tlcInfo.nextStepUnsafe()
-	n.paxosInfo.incrementGlobalClockStep()
-}
-
-func (t *TLCInfo) addTLCMsgUnsafe(tlcMsg types.TLCMessage) bool {
-	if tlcMsg.Step < t.globalClockStep {
+func (p *MultiPaxos) addTLCMsgUnsafe(tlcMsg types.TLCMessage) bool {
+	if tlcMsg.Step < p.globalClockStep {
 		return false
 	}
-	list, ok := t.mapStepListTLCMsg[tlcMsg.Step]
+	list, ok := p.tlc.mapStepListTLCMsg[tlcMsg.Step]
 	if !ok {
 		list = make([]types.TLCMessage, 0)
 	}
 	list = append(list, tlcMsg)
-	t.mapStepListTLCMsg[tlcMsg.Step] = list
+	p.tlc.mapStepListTLCMsg[tlcMsg.Step] = list
+	log.Info().Msgf("added tlc for step %d in current step %d", tlcMsg.Step, p.globalClockStep)
 	return true
 }
 
-func (t *TLCInfo) getNumberOfTLCMessagesForCurrentUnsafe() int {
-	list, ok := t.mapStepListTLCMsg[t.globalClockStep]
+func (p *MultiPaxos) getNumberOfTLCMessagesForCurrentUnsafe() int {
+	list, ok := p.tlc.mapStepListTLCMsg[p.globalClockStep]
 	if !ok {
 		return 0
 	}
 	return len(list)
 }
 
-func (t *TLCInfo) getFirstBlockForCurrentStepUnsafe() (error, types.BlockchainBlock) {
-	list, ok := t.mapStepListTLCMsg[t.globalClockStep]
+func (p *MultiPaxos) getFirstBlockForCurrentStepUnsafe() (error, types.BlockchainBlock) {
+	list, ok := p.tlc.mapStepListTLCMsg[p.globalClockStep]
 	if !ok {
 		return xerrors.Errorf("No block"), types.BlockchainBlock{}
 	}
@@ -65,21 +59,20 @@ func (t *TLCInfo) getFirstBlockForCurrentStepUnsafe() (error, types.BlockchainBl
 }
 
 func (n *node) isTLCConsensusReachedUnsafe() bool {
-	log.Info().Msgf("[%s] num: %d, thresh: %d , steps: %d %d", n.conf.Socket.GetAddress(),
-		n.tlcInfo.getNumberOfTLCMessagesForCurrentUnsafe(),
+	log.Info().Msgf("[%s] num: %d, thresh: %d , steps: %d", n.conf.Socket.GetAddress(),
+		n.multiPaxos.getNumberOfTLCMessagesForCurrentUnsafe(),
 		n.conf.PaxosThreshold(n.conf.TotalPeers),
-		n.tlcInfo.globalClockStep, n.paxosInfo.getGlobalClockStep())
-	return n.tlcInfo.getNumberOfTLCMessagesForCurrentUnsafe() >= n.conf.PaxosThreshold(n.conf.TotalPeers) &&
-		n.tlcInfo.globalClockStep == n.paxosInfo.getGlobalClockStep()
+		n.multiPaxos.globalClockStep)
+	return n.multiPaxos.getNumberOfTLCMessagesForCurrentUnsafe() >= n.conf.PaxosThreshold(n.conf.TotalPeers)
 }
 
 func (n *node) handleTlCMsg(tlcMsg types.TLCMessage) {
 
 	// Acquire lock
-	n.tlcInfo.tlcMutex.Lock()
-	defer n.tlcInfo.tlcMutex.Unlock()
+	n.multiPaxos.multiPaxosMutex.Lock()
+	defer n.multiPaxos.multiPaxosMutex.Unlock()
 	// Add message
-	if !n.tlcInfo.addTLCMsgUnsafe(tlcMsg) {
+	if !n.multiPaxos.addTLCMsgUnsafe(tlcMsg) {
 		return
 	}
 	log.Info().Msgf("[%s] TLC Message added", n.conf.Socket.GetAddress())
@@ -87,7 +80,7 @@ func (n *node) handleTlCMsg(tlcMsg types.TLCMessage) {
 	//check if consensus reached
 	if n.isTLCConsensusReachedUnsafe() {
 		log.Info().Msgf("[%s] TLC consensus reached", n.conf.Socket.GetAddress())
-		err, block := n.tlcInfo.getFirstBlockForCurrentStepUnsafe()
+		err, block := n.multiPaxos.getFirstBlockForCurrentStepUnsafe()
 		if err != nil {
 			return
 		}
@@ -96,7 +89,7 @@ func (n *node) handleTlCMsg(tlcMsg types.TLCMessage) {
 			return
 		}
 		n.broadcastTLCMessageUnsafe(block)
-		n.nextTLCStep()
+		n.multiPaxos.nextGlobalClockStepUnsafe()
 		n.tlcCatchUpUnsafe()
 	}
 }
@@ -118,7 +111,7 @@ func (n *node) saveInBlockchainUnsafe(block types.BlockchainBlock) error {
 }
 func (n *node) tlcCatchUpUnsafe() {
 	for n.isTLCConsensusReachedUnsafe() {
-		err, block := n.tlcInfo.getFirstBlockForCurrentStepUnsafe()
+		err, block := n.multiPaxos.getFirstBlockForCurrentStepUnsafe()
 		if err != nil {
 			return
 		}
@@ -126,18 +119,19 @@ func (n *node) tlcCatchUpUnsafe() {
 		if errSave != nil {
 			return
 		}
-		n.nextTLCStep()
+		n.multiPaxos.nextGlobalClockStepUnsafe()
 	}
+	log.Info().Msgf("[%s] exiting tlc catchup", n.conf.Socket.GetAddress())
 }
 func (n *node) broadcastTLCMessageUnsafe(block types.BlockchainBlock) {
-	if n.tlcInfo.hasBroadcasted || block.Index != n.tlcInfo.globalClockStep {
+	if n.multiPaxos.tlc.hasBroadcasted || block.Index != n.multiPaxos.globalClockStep {
 		return
 	}
-	n.tlcInfo.hasBroadcasted = true
+	n.multiPaxos.tlc.hasBroadcasted = true
 
 	// Create msg
 	tlcMsg := types.TLCMessage{
-		Step:  n.tlcInfo.globalClockStep,
+		Step:  n.multiPaxos.globalClockStep,
 		Block: block,
 	}
 
@@ -161,9 +155,8 @@ func (n *node) broadcastTLCMessageUnsafe(block types.BlockchainBlock) {
 	log.Info().Msgf("[%s]: Broadcasted tlc : step: %d", n.conf.Socket.GetAddress(), tlcMsg.Step)
 }
 
-func (n *node) broadcastTLCMessage(block types.BlockchainBlock) {
-
-	n.tlcInfo.tlcMutex.Lock()
-	defer n.tlcInfo.tlcMutex.Unlock()
-	n.broadcastTLCMessageUnsafe(block)
-}
+//func (n *node) broadcastTLCMessage(block types.BlockchainBlock) {
+//	n.multiPaxos.multiPaxosMutex.Lock()
+//	defer n.multiPaxos.multiPaxosMutex.Unlock()
+//	n.broadcastTLCMessageUnsafe(block)
+//}

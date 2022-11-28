@@ -311,7 +311,7 @@ func (n *node) Tag(name string, mh string) error {
 			}
 
 			// Wait for the turn
-			running, channel := n.paxosInfo.paxos.isProposerRunning()
+			running, channel := n.multiPaxos.isProposerRunning()
 			if running {
 				select {
 				case <-n.notifyEnd:
@@ -337,14 +337,14 @@ func (n *node) Tag(name string, mh string) error {
 
 			switch status {
 			case PROPOSER_STOP_NODE:
-				n.paxosInfo.paxos.notifySuccessfulConsensus()
+				n.multiPaxos.notifySuccessfulConsensus()
 				return nil
 			case PROPOSER_OUR_VALUE:
-				n.paxosInfo.paxos.notifySuccessfulConsensus()
+				n.multiPaxos.notifySuccessfulConsensus()
 				consensusReached = true
 				break
 			case PROPOSER_ERROR:
-				n.paxosInfo.paxos.notifySuccessfulConsensus()
+				n.multiPaxos.notifySuccessfulConsensus()
 				return errCons
 			}
 		}

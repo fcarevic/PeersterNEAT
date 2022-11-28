@@ -2,6 +2,7 @@ package unit
 
 import (
 	"encoding/hex"
+	"github.com/rs/zerolog/log"
 	"math/rand"
 	"os"
 	"sync"
@@ -1474,6 +1475,7 @@ func Test_HW3_Tag_Paxos_Catchup(t *testing.T) {
 	z.ValidateBlockchain(t, blockStore2)
 
 	z.ValidateBlockchain(t, blockStore3)
+	log.Info().Msgf("TestFinished")
 }
 
 // 3-19

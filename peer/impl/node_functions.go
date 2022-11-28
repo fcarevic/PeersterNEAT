@@ -32,6 +32,8 @@ func mainLoop(n *node) {
 			log.Error().Msg(err.Error())
 		}
 
+		//log.Info().Msg("[%s]: ")
+
 		var myAddress = n.conf.Socket.GetAddress()
 		// If message is for me, then process it else relay it
 		if pkt.Header.Destination == myAddress {

@@ -155,9 +155,13 @@ func (n *node) Stop() error {
 		return xerrors.Errorf("Node is nil.")
 	}
 
+	log.Info().Msgf("[%s] odje", n.conf.Socket.GetAddress())
+
 	// acquire lock
 	n.startStopMutex.Lock()
+	log.Info().Msgf("[%s] odje2", n.conf.Socket.GetAddress())
 	if !n.isRunning {
+		log.Info().Msgf("[%s] odje3", n.conf.Socket.GetAddress())
 		n.startStopMutex.Unlock()
 		log.Error().Msg("Attempt to stop non-running node")
 		return xerrors.Errorf("Node is not running.")
@@ -165,9 +169,10 @@ func (n *node) Stop() error {
 	n.isRunning = false
 	close(n.notifyEnd)
 	n.startStopMutex.Unlock()
-
+	log.Info().Msgf("[%s] Waiting for threads to be done", n.conf.Socket.GetAddress())
 	// Wait for all threads to finish
-	n.activeThreads.Wait()
+	//n.activeThreads.Wait()
+	log.Info().Msgf("[%s] Exited", n.conf.Socket.GetAddress())
 	return nil
 }
 

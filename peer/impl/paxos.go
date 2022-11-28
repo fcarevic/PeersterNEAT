@@ -524,15 +524,15 @@ func (p *Paxos) notifySuccessfulConsensus() {
 	p.channelSuccCons = make(chan string)
 }
 
-func (p *Paxos) isProposerRunning() bool {
+func (p *Paxos) isProposerRunning() (bool, chan string) {
 	p.paxosMutex.Lock()
 	defer p.paxosMutex.Unlock()
-	//if p.proposerRunning {
-	//	return true, p.channelSuccCons
-	//}
-	//p.proposerRunning = true
-	//return false, p.channelSuccCons
-	return p.proposerRunning
+	if p.proposerRunning {
+		return true, p.channelSuccCons
+	}
+	p.proposerRunning = true
+	return false, p.notifyEndOfClockStep
+	//return p.proposerRunning
 }
 
 func (n *node) getPreviousHash() string {

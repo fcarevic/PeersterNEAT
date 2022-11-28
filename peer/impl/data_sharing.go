@@ -311,12 +311,14 @@ func (n *node) Tag(name string, mh string) error {
 			}
 
 			// Wait for the turn
-			running := n.paxosInfo.paxos.isProposerRunning()
+			running, channel := n.paxosInfo.paxos.isProposerRunning()
 			if running {
 				select {
 				case <-n.notifyEnd:
 					return nil
-				case <-n.paxosInfo.paxos.notifyEndOfClockStep:
+
+					// This chaannel is waiting the end of previous proposer
+				case <-channel:
 					continue
 				}
 			}
@@ -327,14 +329,22 @@ func (n *node) Tag(name string, mh string) error {
 				Filename: name,
 			})
 
+			// Wait for the end of paxos clock
+			select {
+			case <-channel:
+				break
+			}
+
 			switch status {
 			case PROPOSER_STOP_NODE:
+				n.paxosInfo.paxos.notifySuccessfulConsensus()
 				return nil
 			case PROPOSER_OUR_VALUE:
-				//n.paxosInfo.paxos.notifySuccessfulConsensus()
+				n.paxosInfo.paxos.notifySuccessfulConsensus()
 				consensusReached = true
 				break
 			case PROPOSER_ERROR:
+				n.paxosInfo.paxos.notifySuccessfulConsensus()
 				return errCons
 			}
 		}

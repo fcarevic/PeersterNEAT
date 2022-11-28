@@ -6,7 +6,6 @@ import (
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
 	"golang.org/x/xerrors"
-	"sync"
 )
 
 type TLCInfo struct {
@@ -14,9 +13,6 @@ type TLCInfo struct {
 	// Attributes
 	mapStepListTLCMsg map[uint][]types.TLCMessage
 	hasBroadcasted    bool
-
-	// Semaphores
-	tlcMutex sync.Mutex
 }
 
 func (p *MultiPaxos) nextTLCStepUnsafe() {
@@ -47,15 +43,15 @@ func (p *MultiPaxos) getNumberOfTLCMessagesForCurrentUnsafe() int {
 	return len(list)
 }
 
-func (p *MultiPaxos) getFirstBlockForCurrentStepUnsafe() (error, types.BlockchainBlock) {
+func (p *MultiPaxos) getFirstBlockForCurrentStepUnsafe() (types.BlockchainBlock, error) {
 	list, ok := p.tlc.mapStepListTLCMsg[p.globalClockStep]
 	if !ok {
-		return xerrors.Errorf("No block"), types.BlockchainBlock{}
+		return types.BlockchainBlock{}, xerrors.Errorf("No block")
 	}
 	if len(list) == 0 {
-		return xerrors.Errorf("List empty, no block"), types.BlockchainBlock{}
+		return types.BlockchainBlock{}, xerrors.Errorf("List empty, no block")
 	}
-	return nil, list[0].Block
+	return list[0].Block, nil
 }
 
 func (n *node) isTLCConsensusReachedUnsafe() bool {
@@ -80,7 +76,7 @@ func (n *node) handleTlCMsg(tlcMsg types.TLCMessage) {
 	//check if consensus reached
 	if n.isTLCConsensusReachedUnsafe() {
 		log.Info().Msgf("[%s] TLC consensus reached", n.conf.Socket.GetAddress())
-		err, block := n.multiPaxos.getFirstBlockForCurrentStepUnsafe()
+		block, err := n.multiPaxos.getFirstBlockForCurrentStepUnsafe()
 		if err != nil {
 			return
 		}
@@ -111,7 +107,7 @@ func (n *node) saveInBlockchainUnsafe(block types.BlockchainBlock) error {
 }
 func (n *node) tlcCatchUpUnsafe() {
 	for n.isTLCConsensusReachedUnsafe() {
-		err, block := n.multiPaxos.getFirstBlockForCurrentStepUnsafe()
+		block, err := n.multiPaxos.getFirstBlockForCurrentStepUnsafe()
 		if err != nil {
 			return
 		}

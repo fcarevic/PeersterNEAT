@@ -323,36 +323,31 @@ func (n *node) Tag(name string, mh string) error {
 				}
 			}
 
-			errCons, status := n.runConsensus(types.PaxosValue{
+			status, errCons := n.runConsensus(types.PaxosValue{
 				UniqID:   xid.New().String(),
 				Metahash: mh,
 				Filename: name,
 			})
 
 			// Wait for the end of paxos clock
-			select {
-			case <-channel:
-				break
-			}
+			<-channel
 
 			switch status {
-			case PROPOSER_STOP_NODE:
+			case ProposerStopNode:
 				n.multiPaxos.notifySuccessfulConsensus()
 				return nil
-			case PROPOSER_OUR_VALUE:
-				n.multiPaxos.notifySuccessfulConsensus()
-				consensusReached = true
-				break
-			case PROPOSER_ERROR:
+			case ProposerError:
 				n.multiPaxos.notifySuccessfulConsensus()
 				return errCons
+			case ProposerOurValue:
+				n.multiPaxos.notifySuccessfulConsensus()
+				consensusReached = true
 			}
 		}
 		return nil
-	} else {
-		n.conf.Storage.GetNamingStore().Set(name, []byte(mh))
-		return nil
 	}
+	n.conf.Storage.GetNamingStore().Set(name, []byte(mh))
+	return nil
 
 }
 

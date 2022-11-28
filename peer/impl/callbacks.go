@@ -365,7 +365,6 @@ func (n *node) paxosPromiseMessageCallback(msg types.Message, pkt transport.Pack
 
 	// Check if message is expected
 	n.processPaxosPromiseMsg(*paxosPromiseMsg)
-	log.Info().Msgf("[%s] received promise from %s for ID:%d   step: %d", n.conf.Socket.GetAddress(), pkt.Header.Source, paxosPromiseMsg.ID, paxosPromiseMsg.Step)
 	return nil
 }
 
@@ -377,8 +376,6 @@ func (n *node) paxosAcceptMessageCallback(msg types.Message, pkt transport.Packe
 
 	// Check if message is expected
 	n.processPaxosAcceptMsg(*paxosAcceptMsg, pkt)
-
-	// TODO: what if accepted id is different?
 	return nil
 }
 

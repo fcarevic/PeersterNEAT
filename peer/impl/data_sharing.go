@@ -347,10 +347,8 @@ func (n *node) Tag(name string, mh string) error {
 				n.multiPaxos.notifySuccessfulConsensus()
 				log.Info().Msgf("[%s] runConses finished: filename: %s", n.conf.Socket.GetAddress(), name)
 				consensusReached = true
-				break
 			default:
 				n.multiPaxos.notifySuccessfulConsensus()
-				break
 			}
 		}
 		return nil

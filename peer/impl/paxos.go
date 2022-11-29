@@ -112,7 +112,8 @@ func (n *node) processPaxosPrepareMsg(paxosPrepareMsg types.PaxosPrepareMessage)
 	n.multiPaxos.multiPaxosMutex.Lock()
 	defer n.multiPaxos.multiPaxosMutex.Unlock()
 
-	log.Info().Msgf("[%s] received prepare  in step %d for step %d", n.conf.Socket.GetAddress(), paxosPrepareMsg.Step, n.multiPaxos.globalClockStep)
+	log.Info().Msgf("[%s] received prepare  in step %d for step %d",
+		n.conf.Socket.GetAddress(), paxosPrepareMsg.Step, n.multiPaxos.globalClockStep)
 
 	check := paxosPrepareMsg.Step == n.multiPaxos.globalClockStep && paxosPrepareMsg.ID > n.multiPaxos.paxos.maxID
 	if !check {
@@ -456,15 +457,16 @@ func (n *node) sendProposeMsg(toSend PaxosToSend, step uint) (int, *types.PaxosV
 		}
 	}
 }
-func updateAcceptConsensusMap(acceptMap *map[string][]types.PaxosValue, accptedMsg types.PaxosAcceptMessage) int {
-	list, ok := (*acceptMap)[accptedMsg.Value.UniqID]
-	if !ok {
-		list = make([]types.PaxosValue, 0)
-	}
-	list = append(list, accptedMsg.Value)
-	(*acceptMap)[accptedMsg.Value.UniqID] = list
-	return len(list)
-}
+
+//func updateAcceptConsensusMap(acceptMap *map[string][]types.PaxosValue, accptedMsg types.PaxosAcceptMessage) int {
+//	list, ok := (*acceptMap)[accptedMsg.Value.UniqID]
+//	if !ok {
+//		list = make([]types.PaxosValue, 0)
+//	}
+//	list = append(list, accptedMsg.Value)
+//	(*acceptMap)[accptedMsg.Value.UniqID] = list
+//	return len(list)
+//}
 
 // Returns error and indicator if our value has been accepted
 func (n *node) runConsensus(value types.PaxosValue) (int, error) {
@@ -474,21 +476,18 @@ func (n *node) runConsensus(value types.PaxosValue) (int, error) {
 	for {
 		step := n.multiPaxos.getGlobalClockStep()
 		log.Info().Msgf("[%s]: runConsensus: before first paxos phase", n.conf.Socket.GetAddress())
+
 		n.multiPaxos.setPhaseSafe(PaxosPhase1)
 		status, toSend, errorPrepare := n.sendPrepareMessage(step, &id)
-		if errorPrepare != nil {
+		switch status {
+		case ProposerError:
 			n.multiPaxos.setPhaseSafe(PaxosInit)
 			return status, errorPrepare
-		}
-
-		switch status {
 		case ProposerStopNode:
 			return status, nil
 		case ProposerStopClock:
-			if toSend.value != nil {
-				if value.Metahash == toSend.value.Metahash && value.Filename == toSend.value.Filename {
-					return ProposerOurValue, nil
-				}
+			if toSend.value != nil && (value.Metahash == toSend.value.Metahash && value.Filename == toSend.value.Filename) {
+				return ProposerOurValue, nil
 			}
 			return ProposerStopClock, nil
 		}
@@ -500,12 +499,10 @@ func (n *node) runConsensus(value types.PaxosValue) (int, error) {
 		log.Info().Msgf("[%s]: runConsensus: before second paxos phase", n.conf.Socket.GetAddress())
 		status2, acceptedValue, errPropose := n.sendProposeMsg(toSend, step)
 
-		if errPropose != nil {
+		switch status2 {
+		case ProposerError:
 			log.Info().Msgf("[%s]: runConsensus: finished with error", n.conf.Socket.GetAddress())
 			return status2, errPropose
-		}
-
-		switch status2 {
 		case ProposerStopNode:
 			return status2, nil
 		//case ProposerStopClock:

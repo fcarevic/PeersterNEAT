@@ -318,10 +318,12 @@ func (n *node) Tag(name string, mh string) error {
 					return nil
 
 					// This chaannel is waiting the end of previous proposer
-				case <-channel:
+				case <-*channel:
 					continue
 				}
 			}
+
+			log.Info().Msgf("[%s] runConse: filename: %s", n.conf.Socket.GetAddress(), name)
 
 			status, errCons := n.runConsensus(types.PaxosValue{
 				UniqID:   xid.New().String(),
@@ -330,18 +332,25 @@ func (n *node) Tag(name string, mh string) error {
 			})
 
 			// Wait for the end of paxos clock
-			<-channel
+			//<-channel
 
 			switch status {
 			case ProposerStopNode:
+				log.Info().Msgf("[%s] runConses unfinished: filename: %s", n.conf.Socket.GetAddress(), name)
 				n.multiPaxos.notifySuccessfulConsensus()
 				return nil
 			case ProposerError:
+				log.Info().Msgf("[%s] runConses error: filename: %s", n.conf.Socket.GetAddress(), name)
 				n.multiPaxos.notifySuccessfulConsensus()
 				return errCons
 			case ProposerOurValue:
 				n.multiPaxos.notifySuccessfulConsensus()
+				log.Info().Msgf("[%s] runConses finished: filename: %s", n.conf.Socket.GetAddress(), name)
 				consensusReached = true
+				break
+			default:
+				n.multiPaxos.notifySuccessfulConsensus()
+				break
 			}
 		}
 		return nil

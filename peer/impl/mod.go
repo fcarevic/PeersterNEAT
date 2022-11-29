@@ -47,8 +47,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 				mapPaxosPrepareIDs:   make(map[uint]chan PaxosToSend),
 				mapPaxosProposeIDs:   make(map[uint]chan types.PaxosAcceptMessage),
 				mapPaxosAcceptIDs:    make(map[uint][]types.PaxosAcceptMessage),
-				notifyEndOfClockStep: make(chan string),
-				channelSuccCons:      make(chan string),
+				notifyEndOfClockStep: make(chan types.BlockchainBlock, 5000),
+				channelSuccCons:      make(chan string, 5000),
 			},
 			tlc: TLCInfo{
 				mapStepListTLCMsg: make(map[uint][]types.TLCMessage),

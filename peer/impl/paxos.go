@@ -51,7 +51,7 @@ type Paxos struct {
 	mapPaxosPrepareIDs   map[uint]chan PaxosToSend
 	mapPaxosProposeIDs   map[uint]chan types.PaxosAcceptMessage
 	mapPaxosAcceptIDs    map[uint][]types.PaxosAcceptMessage
-	notifyEndOfClockStep chan string
+	notifyEndOfClockStep chan types.BlockchainBlock
 	channelSuccCons      chan string
 
 	// Field used only for the proposer
@@ -89,8 +89,8 @@ func (p *Paxos) resetPaxosUnsafe() {
 	p.maxID = 0
 	p.acceptedID = 0
 	p.acceptedValue = nil
-	close(p.notifyEndOfClockStep)
-	p.notifyEndOfClockStep = make(chan string, 5000)
+	//close(p.notifyEndOfClockStep)
+	//p.notifyEndOfClockStep = make(chan types.BlockchainBlock, 5000)
 
 	// Reset maps
 	for key := range p.mapPaxosProposeIDs {
@@ -110,22 +110,25 @@ func (p *Paxos) resetPaxosUnsafe() {
 func (n *node) processPaxosPrepareMsg(paxosPrepareMsg types.PaxosPrepareMessage) {
 	// Acquire lock
 	n.multiPaxos.multiPaxosMutex.Lock()
+	defer n.multiPaxos.multiPaxosMutex.Unlock()
+
+	log.Info().Msgf("[%s] received prepare  in step %d for step %d", n.conf.Socket.GetAddress(), paxosPrepareMsg.Step, n.multiPaxos.globalClockStep)
+
 	check := paxosPrepareMsg.Step == n.multiPaxos.globalClockStep && paxosPrepareMsg.ID > n.multiPaxos.paxos.maxID
 	if !check {
-		n.multiPaxos.multiPaxosMutex.Unlock()
 		return
 	}
 	n.multiPaxos.paxos.maxID = paxosPrepareMsg.ID
 	n.sendPaxosPromise(paxosPrepareMsg)
-	n.multiPaxos.multiPaxosMutex.Unlock()
+
 }
 
 func (n *node) processPaxosPromiseMsg(paxosPromiseMsg types.PaxosPromiseMessage) {
 	// Acquire lock
 	n.multiPaxos.multiPaxosMutex.Lock()
+	defer n.multiPaxos.multiPaxosMutex.Unlock()
 	check := paxosPromiseMsg.Step == n.multiPaxos.globalClockStep
-	if !check {
-		n.multiPaxos.multiPaxosMutex.Unlock()
+	if !check || (n.multiPaxos.paxos.proposerRunning && n.multiPaxos.paxos.phase != PaxosPhase1) {
 		return
 	}
 
@@ -143,38 +146,36 @@ func (n *node) processPaxosPromiseMsg(paxosPromiseMsg types.PaxosPromiseMessage)
 				log.Error().Msgf("notifyPaxosID: Panic on sending on the channel")
 			}
 		}()
-		n.multiPaxos.multiPaxosMutex.Unlock()
 		channel <- acceptedValue
 		return
 	}
-	n.multiPaxos.multiPaxosMutex.Unlock()
 }
 
 func (n *node) processPaxosProposeMsg(paxosProposeMsg types.PaxosProposeMessage) {
 	// Acquire lock
 	n.multiPaxos.multiPaxosMutex.Lock()
+	defer n.multiPaxos.multiPaxosMutex.Unlock()
 
 	check := paxosProposeMsg.Step == n.multiPaxos.globalClockStep && paxosProposeMsg.ID == n.multiPaxos.paxos.maxID
 	if !check {
-		n.multiPaxos.multiPaxosMutex.Unlock()
 		return
 	}
-
 	n.broadcastPaxosAcceptUnsafe(paxosProposeMsg.ID, paxosProposeMsg.Step, paxosProposeMsg.Value)
-	n.multiPaxos.multiPaxosMutex.Unlock()
 }
 
 func (n *node) processPaxosAcceptMsg(paxosAcceptMsg types.PaxosAcceptMessage, pkt transport.Packet) {
 	// Acquire lock
 	n.multiPaxos.multiPaxosMutex.Lock()
+	defer n.multiPaxos.multiPaxosMutex.Unlock()
 	//if !(paxosAcceptMsg.Step == n.multiPaxos.globalClockStep && n.multiPaxos.paxos.phase != PAXOS_PHASE1)
 	if !(paxosAcceptMsg.Step == n.multiPaxos.globalClockStep) {
-		n.multiPaxos.multiPaxosMutex.Unlock()
+		log.Info().Msgf("[%s] rejected accept msg", n.conf.Socket.GetAddress())
+
 		return
 	}
 	log.Info().Msgf("[%s] received accept from %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
 	id := paxosAcceptMsg.ID
-	channel, ok := n.multiPaxos.paxos.mapPaxosProposeIDs[id]
+	//channel, ok := n.multiPaxos.paxos.mapPaxosProposeIDs[id]
 
 	// Handle accept msg
 	list, exist := n.multiPaxos.paxos.mapPaxosAcceptIDs[id]
@@ -184,12 +185,12 @@ func (n *node) processPaxosAcceptMsg(paxosAcceptMsg types.PaxosAcceptMessage, pk
 	list = append(list, paxosAcceptMsg)
 	n.multiPaxos.paxos.mapPaxosAcceptIDs[id] = list
 	if len(list) >= n.conf.PaxosThreshold(n.conf.TotalPeers) {
-		n.broadcastTLCMessageUnsafe(createBlockchainBlock(paxosAcceptMsg.Step, n.getPreviousHash(), paxosAcceptMsg.Value))
+		block := createBlockchainBlock(paxosAcceptMsg.Step, n.getPreviousHash(), paxosAcceptMsg.Value)
+		n.broadcastTLCMessageUnsafe(block)
 	}
-	n.multiPaxos.multiPaxosMutex.Unlock()
-	if ok {
-		channel <- paxosAcceptMsg
-	}
+	//if ok {
+	//	channel <- paxosAcceptMsg
+	//}
 }
 
 func (p *Paxos) getAcceptedValueUnsafe() (uint, *types.PaxosValue) {
@@ -312,7 +313,7 @@ func (n *node) sendPrepareMessage(step uint, id *uint) (int, PaxosToSend, error)
 
 	var i uint
 	retVal := PaxosToSend{}
-	channel := make(chan PaxosToSend)
+	channel := make(chan PaxosToSend, 5000)
 
 	defer func(channel chan PaxosToSend, n *node) {
 		close(channel)
@@ -327,11 +328,14 @@ func (n *node) sendPrepareMessage(step uint, id *uint) (int, PaxosToSend, error)
 		*id = n.conf.PaxosID + i*n.conf.TotalPeers
 		retVal.id = *id
 		n.multiPaxos.registerPreparePaxosID(*id, channel)
+		log.Info().Msgf("[%s] broadcasting prepare", n.conf.Socket.GetAddress())
 
 		eerBroadcast := n.broadcastPrepareMsg(step, id)
 		if eerBroadcast != nil {
 			return ProposerError, PaxosToSend{}, eerBroadcast
 		}
+
+		log.Info().Msgf("[%s] broadcasted prepare", n.conf.Socket.GetAddress())
 
 		flag := false
 		for !flag {
@@ -347,8 +351,9 @@ func (n *node) sendPrepareMessage(step uint, id *uint) (int, PaxosToSend, error)
 			case <-n.notifyEnd:
 				return ProposerStopNode, PaxosToSend{}, xerrors.Errorf("Stopping node")
 
-			case <-n.multiPaxos.paxos.notifyEndOfClockStep:
-				return ProposerStopClock, PaxosToSend{}, xerrors.Errorf("Stopping clock step")
+			case block := <-n.multiPaxos.paxos.notifyEndOfClockStep:
+				log.Info().Msgf("[%s] End of clock in send prepare", n.conf.Socket.GetAddress())
+				return ProposerStopClock, PaxosToSend{value: &block.Value}, nil
 
 			case <-time.After(n.conf.PaxosProposerRetry):
 				n.multiPaxos.unregisterPreparePaxosID(*id)
@@ -411,6 +416,8 @@ func (n *node) sendProposeMsg(toSend PaxosToSend, step uint) (int, *types.PaxosV
 		return ProposerError, nil, errMarshall
 	}
 
+	endStepChannel := n.multiPaxos.paxos.notifyEndOfClockStep
+
 	// Broadcast
 	errBroadcast := n.Broadcast(transportMsg)
 	if errBroadcast != nil {
@@ -419,9 +426,9 @@ func (n *node) sendProposeMsg(toSend PaxosToSend, step uint) (int, *types.PaxosV
 		return ProposerError, nil, errBroadcast
 	}
 
-	channel := make(chan types.PaxosAcceptMessage)
+	channel := make(chan types.PaxosAcceptMessage, 5000)
 	n.multiPaxos.registerProposePaxosID(toSend.id, channel)
-	receivedAccepts := make(map[string][]types.PaxosValue)
+	//receivedAccepts := make(map[string][]types.PaxosValue)
 
 	defer func(toSend PaxosToSend, n *node, channel chan types.PaxosAcceptMessage) {
 		n.multiPaxos.unregisterProposePaxosID(toSend.id)
@@ -430,17 +437,19 @@ func (n *node) sendProposeMsg(toSend PaxosToSend, step uint) (int, *types.PaxosV
 
 	for {
 		select {
-		case acceptMsg := <-channel:
-			cnt := updateAcceptConsensusMap(&receivedAccepts, acceptMsg)
-			if cnt >= n.conf.PaxosThreshold(n.conf.TotalPeers) {
-				return ProposerOk, &acceptMsg.Value, nil
-			}
+		case <-channel:
 			break
+		//case acceptMsg := <-channel:
+		//	cnt := updateAcceptConsensusMap(&receivedAccepts, acceptMsg)
+		//	if cnt >= n.conf.PaxosThreshold(n.conf.TotalPeers) {
+		//		return ProposerOk, &acceptMsg.Value, nil
+		//	}
+		//	break
 		case <-n.notifyEnd:
 			return ProposerStopNode, nil, xerrors.Errorf("Stopping node")
 
-		case <-n.multiPaxos.paxos.notifyEndOfClockStep:
-			return ProposerStopClock, nil, xerrors.Errorf("Stopping clock step")
+		case block := <-endStepChannel:
+			return ProposerStopClock, &block.Value, nil //xerrors.Errorf("Stopping clock step")
 		case <-time.After(n.conf.PaxosProposerRetry):
 			return ProposerTimeout, nil, nil
 
@@ -461,9 +470,9 @@ func updateAcceptConsensusMap(acceptMap *map[string][]types.PaxosValue, accptedM
 func (n *node) runConsensus(value types.PaxosValue) (int, error) {
 
 	var id uint
-	step := n.multiPaxos.getGlobalClockStep()
 	// Send prepare
 	for {
+		step := n.multiPaxos.getGlobalClockStep()
 		log.Info().Msgf("[%s]: runConsensus: before first paxos phase", n.conf.Socket.GetAddress())
 		n.multiPaxos.setPhaseSafe(PaxosPhase1)
 		status, toSend, errorPrepare := n.sendPrepareMessage(step, &id)
@@ -471,9 +480,19 @@ func (n *node) runConsensus(value types.PaxosValue) (int, error) {
 			n.multiPaxos.setPhaseSafe(PaxosInit)
 			return status, errorPrepare
 		}
-		if status == ProposerStopNode || status == ProposerStopClock {
+
+		switch status {
+		case ProposerStopNode:
 			return status, nil
+		case ProposerStopClock:
+			if toSend.value != nil {
+				if value.Metahash == toSend.value.Metahash && value.Filename == toSend.value.Filename {
+					return ProposerOurValue, nil
+				}
+			}
+			return ProposerStopClock, nil
 		}
+
 		n.multiPaxos.setPhaseSafe(PaxosPhase2)
 		if toSend.value == nil {
 			toSend.value = &value
@@ -488,12 +507,12 @@ func (n *node) runConsensus(value types.PaxosValue) (int, error) {
 
 		switch status2 {
 		case ProposerStopNode:
-		case ProposerStopClock:
 			return status2, nil
+		//case ProposerStopClock:
+		//	return status2, nil
 		case ProposerTimeout:
 			n.multiPaxos.setPhaseSafe(PaxosPhase1)
 			continue
-
 		}
 		n.multiPaxos.setPhaseSafe(PaxosInit)
 		log.Info().Msgf("[%s]: runConsensus: paxos finished", n.conf.Socket.GetAddress())
@@ -514,14 +533,14 @@ func (p *MultiPaxos) notifySuccessfulConsensus() {
 	p.paxos.channelSuccCons = make(chan string)
 }
 
-func (p *MultiPaxos) isProposerRunning() (bool, chan string) {
+func (p *MultiPaxos) isProposerRunning() (bool, *chan string) {
 	p.multiPaxosMutex.Lock()
 	defer p.multiPaxosMutex.Unlock()
 	if p.paxos.proposerRunning {
-		return true, p.paxos.channelSuccCons
+		return true, &p.paxos.channelSuccCons
 	}
 	p.paxos.proposerRunning = true
-	return false, p.paxos.notifyEndOfClockStep
+	return false, nil
 	//return p.proposerRunning
 }
 

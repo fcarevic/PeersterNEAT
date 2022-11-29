@@ -78,14 +78,18 @@ func (n *node) handleTlCMsg(tlcMsg types.TLCMessage) {
 		log.Info().Msgf("[%s] TLC consensus reached", n.conf.Socket.GetAddress())
 		block, err := n.multiPaxos.getFirstBlockForCurrentStepUnsafe()
 		if err != nil {
+			log.Info().Msgf("[%s] TLC error get first block", n.conf.Socket.GetAddress())
 			return
 		}
 		errSave := n.saveInBlockchainUnsafe(block)
 		if errSave != nil {
+			log.Info().Msgf("[%s] TLC error save in block", n.conf.Socket.GetAddress())
 			return
 		}
+		n.multiPaxos.paxos.notifyEndOfClockStep <- block
 		n.broadcastTLCMessageUnsafe(block)
 		n.multiPaxos.nextGlobalClockStepUnsafe()
+		log.Info().Msgf("[%s] Went to next step  %d", n.conf.Socket.GetAddress(), n.multiPaxos.globalClockStep)
 		n.tlcCatchUpUnsafe()
 	}
 }

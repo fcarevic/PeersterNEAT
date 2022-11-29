@@ -340,7 +340,7 @@ func (n *node) paxosPrepareMessageCallback(msg types.Message, pkt transport.Pack
 
 	// Check if message is expected
 	n.processPaxosPrepareMsg(*paxosPrepareMsg)
-	log.Info().Msgf("[%s] received prepare from %s : in step %d for step %d",
+	log.Info().Msgf("[%s] received prepare from %s : in step %d",
 		n.conf.Socket.GetAddress(), pkt.Header.Source, paxosPrepareMsg.Step)
 	return nil
 }

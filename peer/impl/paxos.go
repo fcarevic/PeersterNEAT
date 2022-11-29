@@ -317,8 +317,8 @@ func (n *node) sendPrepareMessage(step uint, id *uint) (int, PaxosToSend, error)
 	channel := make(chan PaxosToSend, 5000)
 
 	defer func(channel chan PaxosToSend, n *node) {
-		close(channel)
 		n.multiPaxos.unregisterPreparePaxosID(*id)
+		close(channel)
 	}(channel, n)
 
 	for {

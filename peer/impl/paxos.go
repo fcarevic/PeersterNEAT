@@ -50,7 +50,7 @@ type Paxos struct {
 	// Map of channels for IDs
 	mapPaxosPrepareIDs   map[uint]chan PaxosToSend
 	mapPaxosProposeIDs   map[uint]chan types.PaxosAcceptMessage
-	mapPaxosAcceptIDs    map[uint][]types.PaxosAcceptMessage
+	mapPaxosAcceptIDs    map[string][]types.PaxosAcceptMessage
 	notifyEndOfClockStep chan types.BlockchainBlock
 	channelSuccCons      chan string
 
@@ -175,7 +175,7 @@ func (n *node) processPaxosAcceptMsg(paxosAcceptMsg types.PaxosAcceptMessage, pk
 		return
 	}
 	log.Info().Msgf("[%s] received accept from %s", n.conf.Socket.GetAddress(), pkt.Header.Source)
-	id := paxosAcceptMsg.ID
+	id := paxosAcceptMsg.Value.UniqID
 	//channel, ok := n.multiPaxos.paxos.mapPaxosProposeIDs[id]
 
 	// Handle accept msg
@@ -486,7 +486,7 @@ func (n *node) runConsensus(value types.PaxosValue) (int, error) {
 		case ProposerStopNode:
 			return status, nil
 		case ProposerStopClock:
-			if toSend.value != nil && (value.Metahash == toSend.value.Metahash && value.Filename == toSend.value.Filename) {
+			if toSend.value != nil && (value.UniqID == toSend.value.UniqID) {
 				return ProposerOurValue, nil
 			}
 			return ProposerStopClock, nil
@@ -513,7 +513,8 @@ func (n *node) runConsensus(value types.PaxosValue) (int, error) {
 		}
 		n.multiPaxos.setPhaseSafe(PaxosInit)
 		log.Info().Msgf("[%s]: runConsensus: paxos finished", n.conf.Socket.GetAddress())
-		isOurValue := value.Metahash == acceptedValue.Metahash && value.Filename == acceptedValue.Filename
+		//isOurValue := value.Metahash == acceptedValue.Metahash && value.Filename == acceptedValue.Filename
+		isOurValue := value.UniqID == acceptedValue.UniqID
 		if isOurValue {
 			return ProposerOurValue, nil
 		}

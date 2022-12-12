@@ -27,3 +27,4 @@ peer/impl/graph.pdf
 gui/node
 peer/tests/integration/node*
 gui/gui
+video/

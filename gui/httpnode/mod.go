@@ -95,10 +95,20 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 
 	mux.Handle("/blockchain", http.HandlerFunc(blockchain.BlockchainHandler()))
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not authorized", http.StatusBadGateway)
-		log.Error().Msgf("wrong endpoint: %s", r.URL.Path)
-	})
+	mux.Handle(
+		"/video/",
+		http.StripPrefix(
+			"/video/",
+			addHeaders(http.FileServer(http.Dir("/home/andrijajelenkovic/Documents/EPFL/dse/cs438-2022-hw3-student-037/gui/web/assets/hlsVideo"))),
+		),
+	)
+
+	mux.HandleFunc(
+		"/", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "not authorized", http.StatusBadGateway)
+			log.Error().Msgf("wrong endpoint: %s", r.URL.Path)
+		},
+	)
 
 	return &httpnode{
 		Peer: node,
@@ -106,6 +116,13 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 		log:  &log,
 		mux:  mux,
 		quit: make(chan struct{}),
+	}
+}
+
+func addHeaders(h http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		h.ServeHTTP(w, r)
 	}
 }
 
@@ -225,34 +242,38 @@ func (h *httpnode) stop() {
 // logging is a utility function that logs the http server events
 func logging(logger *zerolog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer func() {
-				requestID, ok := r.Context().Value(requestIDKey).(string)
-				if !ok {
-					requestID = "unknown"
-				}
-				logger.Info().Str("requestID", requestID).
-					Str("method", r.Method).
-					Str("url", r.URL.Path).
-					Str("remoteAddr", r.RemoteAddr).
-					Str("agent", r.UserAgent()).Msg("")
-			}()
-			next.ServeHTTP(w, r)
-		})
+		return http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				defer func() {
+					requestID, ok := r.Context().Value(requestIDKey).(string)
+					if !ok {
+						requestID = "unknown"
+					}
+					logger.Info().Str("requestID", requestID).
+						Str("method", r.Method).
+						Str("url", r.URL.Path).
+						Str("remoteAddr", r.RemoteAddr).
+						Str("agent", r.UserAgent()).Msg("")
+				}()
+				next.ServeHTTP(w, r)
+			},
+		)
 	}
 }
 
 // tracing is a utility function that adds header tracing
 func tracing(nextRequestID func() string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestID := r.Header.Get("X-Request-Id")
-			if requestID == "" {
-				requestID = nextRequestID()
-			}
-			ctx := context.WithValue(r.Context(), requestIDKey, requestID)
-			w.Header().Set("X-Request-Id", requestID)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+		return http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				requestID := r.Header.Get("X-Request-Id")
+				if requestID == "" {
+					requestID = nextRequestID()
+				}
+				ctx := context.WithValue(r.Context(), requestIDKey, requestID)
+				w.Header().Set("X-Request-Id", requestID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+			},
+		)
 	}
 }

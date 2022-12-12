@@ -62,10 +62,18 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		multicstInfo: MulticastInfo{
 			mapMulticastClients: make(map[string][]string),
 		},
+
+		// PROJECT Naca
+		crowdsInfo: CrowdsInfo{
+			chunkMap:        NewAtomicChunkMap(),
+			chunkChannelMap: NewAtomicChannelTable(),
+		},
 	}
 
 	// Add self-address to routing table
 	n.routingTable[n.conf.Socket.GetAddress()] = n.conf.Socket.GetAddress()
+
+	n.CrowdsInit(conf) // PROJECT Naca
 
 	// Register callbacks
 	n.conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, n.chatMessageCallback)
@@ -107,6 +115,9 @@ type node struct {
 
 	// Mulitcast
 	multicstInfo MulticastInfo
+
+	// Crowds
+	crowdsInfo CrowdsInfo
 
 	// routing
 	routingTable peer.RoutingTable
@@ -190,6 +201,7 @@ func (n *node) Stop() error {
 	log.Info().Msgf("[%s] Waiting for threads to be done", n.conf.Socket.GetAddress())
 	// Wait for all threads to finish
 	n.activeThreads.Wait()
+	n.crowdsInfo.chunkChannelMap.CloseDeleteAll() // PROJECT Naca
 	log.Info().Msgf("[%s] Exited", n.conf.Socket.GetAddress())
 	return nil
 }

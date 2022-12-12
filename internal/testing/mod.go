@@ -150,6 +150,8 @@ type configTemplate struct {
 	paxosThreshold     func(uint) int
 	paxosID            uint
 	paxosProposerRetry time.Duration
+	// PROJECT Naca
+	crowdsProbability float64
 }
 
 func newConfigTemplate() configTemplate {
@@ -184,6 +186,9 @@ func newConfigTemplate() configTemplate {
 		},
 		paxosID:            0,
 		paxosProposerRetry: time.Second * 5,
+
+		// PROJECT Naca
+		crowdsProbability: 0.5,
 	}
 }
 
@@ -321,6 +326,8 @@ func NewTestNode(t require.TestingT, f peer.Factory, trans transport.Transport,
 	config.PaxosID = template.paxosID
 	config.PaxosProposerRetry = template.paxosProposerRetry
 
+	config.CrowdsProbability = template.crowdsProbability // PROJECT Naca
+
 	node := f(config)
 
 	require.Equal(t, len(template.messages), len(template.handlers))
@@ -407,6 +414,66 @@ func (t TestNode) GetChatMsgs() []*types.ChatMessage {
 
 	return chatMsgs
 }
+
+// PROJECT Naca
+func (t TestNode) GetCrowdsMsgs() []*types.CrowdsMessage {
+	msgs := t.config.MessageRegistry.GetMessages()
+
+	crowdsMsgs := make([]*types.CrowdsMessage, 0)
+
+	for _, msg := range msgs {
+		crowdsMsg, ok := msg.(*types.CrowdsMessage)
+		if ok {
+			crowdsMsgs = append(crowdsMsgs, crowdsMsg)
+		}
+	}
+
+	return crowdsMsgs
+}
+func (t TestNode) GetCrowdsMessagingRequestMsgs() []*types.CrowdsMessagingRequestMessage {
+	msgs := t.config.MessageRegistry.GetMessages()
+
+	crowdsMsgs := make([]*types.CrowdsMessagingRequestMessage, 0)
+
+	for _, msg := range msgs {
+		crowdsMsg, ok := msg.(*types.CrowdsMessagingRequestMessage)
+		if ok {
+			crowdsMsgs = append(crowdsMsgs, crowdsMsg)
+		}
+	}
+
+	return crowdsMsgs
+}
+func (t TestNode) GetCrowdsDownloadRequestMsgs() []*types.CrowdsDownloadRequestMessage {
+	msgs := t.config.MessageRegistry.GetMessages()
+
+	crowdsMsgs := make([]*types.CrowdsDownloadRequestMessage, 0)
+
+	for _, msg := range msgs {
+		crowdsMsg, ok := msg.(*types.CrowdsDownloadRequestMessage)
+		if ok {
+			crowdsMsgs = append(crowdsMsgs, crowdsMsg)
+		}
+	}
+
+	return crowdsMsgs
+}
+func (t TestNode) GetCrowdsDownloadReplyMsgs() []*types.CrowdsDownloadReplyMessage {
+	msgs := t.config.MessageRegistry.GetMessages()
+
+	crowdsMsgs := make([]*types.CrowdsDownloadReplyMessage, 0)
+
+	for _, msg := range msgs {
+		crowdsMsg, ok := msg.(*types.CrowdsDownloadReplyMessage)
+		if ok {
+			crowdsMsgs = append(crowdsMsgs, crowdsMsg)
+		}
+	}
+
+	return crowdsMsgs
+}
+
+// KRAJ
 
 // GetStorage returns the storage provided to the node.
 func (t TestNode) GetStorage() storage.Storage {

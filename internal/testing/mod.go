@@ -488,6 +488,46 @@ func GetAck(t *testing.T, msg *transport.Message) types.AckMessage {
 	return ack
 }
 
+// GetStreamDataMessage returns the Ack associated to the transport.Message.
+func GetStreamDataMessage(t *testing.T, msg *transport.Message) types.StreamDataMessage {
+	require.Equal(t, "streamdatamessage", msg.Type)
+
+	var ack types.StreamDataMessage
+	err := json.Unmarshal(msg.Payload, &ack)
+	require.NoError(t, err)
+	return ack
+}
+
+// GetStreamConnectMessage returns the Ack associated to the transport.Message.
+func GetStreamConnectMessage(t *testing.T, msg *transport.Message) types.StreamConnectMessage {
+	require.Equal(t, "streamjoinmessage", msg.Type)
+
+	var ack types.StreamConnectMessage
+	err := json.Unmarshal(msg.Payload, &ack)
+	require.NoError(t, err)
+	return ack
+}
+
+// GetMulticastJoinMessage returns the Ack associated to the transport.Message.
+func GetMulticastJoinMessage(t *testing.T, msg *transport.Message) types.MulticastJoinMessage {
+	require.Equal(t, "multicastjoinmessage", msg.Type)
+
+	var ack types.MulticastJoinMessage
+	err := json.Unmarshal(msg.Payload, &ack)
+	require.NoError(t, err)
+	return ack
+}
+
+// GetMulticastMessage returns the Ack associated to the transport.Message.
+func GetMulticastMessage(t *testing.T, msg *transport.Message) types.MulticastMessage {
+	require.Equal(t, "multicastmessage", msg.Type)
+
+	var ack types.MulticastMessage
+	err := json.Unmarshal(msg.Payload, &ack)
+	require.NoError(t, err)
+	return ack
+}
+
 // GetStatus returns the Status associated to the transport.Message.
 func GetStatus(t *testing.T, msg *transport.Message) types.StatusMessage {
 	require.Equal(t, "status", msg.Type)

@@ -54,6 +54,14 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 				mapStepListTLCMsg: make(map[uint][]types.TLCMessage),
 			},
 		},
+		streamInfo: StreamInfo{
+			mapClients:       make(map[string][]string),
+			mapKeysListening: make(map[string][]byte),
+			mapListening:     make(map[string][]types.StreamMessage),
+		},
+		multicstInfo: MulticastInfo{
+			mapMulticastClients: make(map[string][]string),
+		},
 	}
 
 	// Add self-address to routing table
@@ -76,6 +84,13 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
 
+	// Project
+	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastMessage{}, n.multicastMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastJoinMessage{}, n.multicastJoinMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamDataMessage{}, n.streamDataMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamAcceptMessage{}, n.streamAcceptMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamConnectMessage{}, n.streamConnectMessageCallback)
+
 	return &n
 }
 
@@ -86,6 +101,12 @@ type node struct {
 	peer.Peer
 	// You probably want to keep the peer.Configuration on this struct:
 	conf peer.Configuration
+
+	// Streaming
+	streamInfo StreamInfo
+
+	// Mulitcast
+	multicstInfo MulticastInfo
 
 	// routing
 	routingTable peer.RoutingTable

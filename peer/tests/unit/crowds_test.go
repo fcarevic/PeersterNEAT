@@ -51,8 +51,8 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 	log.Info().Msgf("%s", chatMsgs)
 }
 
-// Download a file that the peer has partially locally. C1 is in A and C2 in C:
-// A <-> B <-> C
+// A wants to download file via crowds...
+// A <-> B <-> C <-> D
 func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 

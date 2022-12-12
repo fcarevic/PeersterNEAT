@@ -111,6 +111,10 @@ func (n *node) CrowdsInit(conf peer.Configuration) {
 	conf.MessageRegistry.RegisterMessageCallback(types.CrowdsDownloadReplyMessage{}, n.CrowdsDownloadReplyMessageCallback)
 }
 
+func (n *node) CrowdsDestroy() {
+	n.crowdsInfo.chunkChannelMap.CloseDeleteAll()
+}
+
 /************
 * CALLBACKS *
 *************/

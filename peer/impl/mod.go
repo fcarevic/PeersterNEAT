@@ -201,7 +201,6 @@ func (n *node) Stop() error {
 	log.Info().Msgf("[%s] Waiting for threads to be done", n.conf.Socket.GetAddress())
 	// Wait for all threads to finish
 	n.activeThreads.Wait()
-	n.crowdsInfo.chunkChannelMap.CloseDeleteAll() // PROJECT Naca
 	log.Info().Msgf("[%s] Exited", n.conf.Socket.GetAddress())
 	return nil
 }

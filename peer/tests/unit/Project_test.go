@@ -261,6 +261,51 @@ func Test_Project_SimpleStream(t *testing.T) {
 
 }
 
+func Test_Project_FFMPG4_Stream(t *testing.T) {
+	transp := channel.NewTransport()
+	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
+
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
+	defer node1.Stop()
+	defer node2.Stop()
+
+	node1.AddPeer(node2.GetAddr())
+	node2.AddPeer(node1.GetAddr())
+	node1.Start()
+	node2.Start()
+
+	movieName := "file"
+	price := 10
+
+	streamID, err := node1.AnnounceStreaming(movieName, uint(price))
+	require.NoError(t, err)
+
+	// Wait for announcement to finish
+	time.Sleep(10 * time.Millisecond)
+	err = node2.ConnectToStream(streamID, node1.GetAddr())
+	require.NoError(t, err)
+
+	// Wait for announcement to finish
+	time.Sleep(10 * time.Millisecond)
+
+	clients, err := node1.GetClients(streamID)
+	require.NoError(t, err)
+	require.Len(t, clients, 1)
+
+	// Stream
+	manifestName := "filename.m3u8"
+	dir := "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/video"
+	node1.StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID)
+	time.Sleep(3 * time.Second)
+
+	// Node2 Should received all chunks
+	dir = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/recvvideo"
+	err = node2.ReceiveFFMPG4(streamID, dir)
+	require.NoError(t, err)
+	log.Info().Msgf("Test Done")
+}
+
 // // 3-2
 // //
 // // Node 1 streams. Node 3 becomes a client

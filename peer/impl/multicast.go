@@ -86,7 +86,7 @@ func (n *node) Multicast(msg types.MulticastMessage) error {
 		err := n.Unicast(peer, transportMsg)
 		if err != nil {
 			log.Error().Msgf("[%s] Multicast: Sending failed for multicast peer: %s, error : %s",
-				n.conf.Socket.GetAddress(), peer, errMarshall.Error())
+				n.conf.Socket.GetAddress(), peer, err.Error())
 		}
 	}
 	return nil

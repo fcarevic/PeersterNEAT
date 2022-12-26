@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const MULTICASTCHUNKSIZE = 512
+const MULTICASTCHUNKSIZE = 1024 * 1024 * 12
 const STREAMSLEEPTIME = time.Millisecond
 
 type StreamInfo struct {
@@ -83,7 +83,13 @@ func (s *StreamInfo) getNextChunks(streamID string, numberOfChunks int) ([]types
 	if !ok {
 		return []types.StreamMessage{}, xerrors.Errorf("Stream does not exist.")
 	}
-	return streamMsgs[:numberOfChunks], nil
+	if numberOfChunks == -1 {
+		s.mapListening[streamID] = []types.StreamMessage{}
+		return streamMsgs, nil
+	}
+	retVal := streamMsgs[:numberOfChunks]
+	s.mapListening[streamID] = streamMsgs[numberOfChunks:]
+	return retVal, nil
 }
 
 func (n *node) GetNextChunks(streamID string, numberOfChunks int) ([]types.StreamMessage, error) {
@@ -181,8 +187,7 @@ func (n *node) Stream(data io.Reader, name string, price uint, streamID string) 
 		Price:             price,
 		CurrentlyWatching: 0,
 	}
-	n.activeThreads.Add(1)
-	go n.stream(data, streamInfo, symmetricKey)
+	n.stream(data, streamInfo, symmetricKey)
 	return nil
 }
 
@@ -250,7 +255,6 @@ func (n *node) broadcastStartStreaming(streamInfo types.StreamInfo) error {
 }
 
 func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey []byte) {
-	defer n.activeThreads.Done()
 
 	// TODO : Add end of stream channel and node stopping!
 	// TODO : Add sleep for streaming!
@@ -263,7 +267,7 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 	for {
 		time.Sleep(STREAMSLEEPTIME)
 
-		chunk := make([]byte, n.conf.ChunkSize)
+		chunk := make([]byte, MULTICASTCHUNKSIZE)
 		numBytes, errRead := data.Read(chunk)
 		if errRead != nil && errRead != io.EOF {
 			log.Error().Msgf("[%s]: stream: error while reading the file: %s",

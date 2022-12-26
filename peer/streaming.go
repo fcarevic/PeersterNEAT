@@ -30,4 +30,7 @@ type Streaming interface {
 
 	// GetNextChunks returns numberOfChunks last received chunks for the streamID. returns error if the chunk does not exist.
 	GetNextChunks(streamID string, numberOfChunks int) ([]types.StreamMessage, error)
+
+	StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string)
+	ReceiveFFMPG4(streamID string, dir string) error
 }

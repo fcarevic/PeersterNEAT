@@ -61,7 +61,7 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStreaming("file1", 10)
+	streamID, err := node1.AnnounceStartStreaming("file1", 10)
 	require.NoError(t, err)
 
 	// Wait for announcement and at least one packet to be sent
@@ -116,7 +116,7 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 // 		4. 		1 - 2 StreamAcceptMessage
 // 		4. 		2 - 1 MulticastMessage(StreamDataMessage(StreamMessage))
 
-func Test_Project_SimpleStream(t *testing.T) {
+func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
@@ -147,7 +147,7 @@ func Test_Project_SimpleStream(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStreaming(fileName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -261,9 +261,161 @@ func Test_Project_SimpleStream(t *testing.T) {
 
 }
 
-func Test_Project_FFMPG4_Stream(t *testing.T) {
+func Test_Project_SimpleStream(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
+
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
+	defer node1.Stop()
+	defer node2.Stop()
+
+	node1.AddPeer(node2.GetAddr())
+	node2.AddPeer(node1.GetAddr())
+	node1.Start()
+	node2.Start()
+
+	chunk1 := make([]byte, chunkSize)
+	chunk2 := make([]byte, chunkSize)
+	chunk3 := make([]byte, chunkSize/3)
+
+	chunks := [][]byte{chunk1, chunk2, chunk3}
+
+	chunk1[0] = 0xa
+	chunk2[0] = 0xb
+	chunk3[0] = 0xc
+
+	data := append(chunk1, append(chunk2, chunk3...)...)
+
+	fileName := "file"
+	price := 10
+
+	buf := bytes.NewBuffer(data)
+
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
+	require.NoError(t, err)
+
+	// Wait for announcement to finish
+	time.Sleep(10 * time.Millisecond)
+	err = node2.ConnectToStream(streamID, node1.GetAddr())
+	require.NoError(t, err)
+
+	// Wait for announcement to finish
+	time.Sleep(10 * time.Millisecond)
+
+	clients, err := node1.GetClients(streamID)
+	require.NoError(t, err)
+	require.Len(t, clients, 1)
+
+	// Stream
+	err = node1.Stream(buf, fileName, uint(price), streamID)
+	require.NoError(t, err)
+
+	// Wait for stream to finish
+	time.Sleep(50 * time.Millisecond)
+
+	// Node 1 should have sent:
+	// 1. 	Rumor(StreamStartMessage)
+	// 2. 	StreamAcceptMessage
+	// 3.   MulticastMessage(StreamData)
+	// 4.   MulticastMessage(StreamData)
+	// 5.   MulticastMessage(StreamData)
+
+	n1Outs := node1.GetOuts()
+	require.Len(t, n1Outs, 5)
+
+	require.Equal(t, "rumor", n1Outs[0].Msg.Type)
+	rumors := z.GetRumor(t, n1Outs[0].Msg)
+	require.Len(t, rumors.Rumors, 1)
+	require.Equal(t, "streamstartmessage", rumors.Rumors[0].Msg.Type)
+	require.Equal(t, "streamacceptmessage", n1Outs[1].Msg.Type)
+
+	require.Equal(t, "multicastmessage", n1Outs[2].Msg.Type)
+	multicastMsg := z.GetMulticastMessage(t, n1Outs[2].Msg)
+	require.Equal(t, "streamdatamessage", multicastMsg.Message.Type)
+
+	require.Equal(t, "multicastmessage", n1Outs[3].Msg.Type)
+	multicastMsg = z.GetMulticastMessage(t, n1Outs[3].Msg)
+	require.Equal(t, "streamdatamessage", multicastMsg.Message.Type)
+
+	require.Equal(t, "multicastmessage", n1Outs[4].Msg.Type)
+	multicastMsg = z.GetMulticastMessage(t, n1Outs[4].Msg)
+	require.Equal(t, "streamdatamessage", multicastMsg.Message.Type)
+
+	// Node 1 should have received:
+	// 1.	Ack
+	// 2. 	MulticastJoinMessage(StreamJoinMessage)
+	n1Ins := node1.GetIns()
+	require.Len(t, n1Ins, 2)
+	require.Equal(t, "ack", n1Ins[0].Msg.Type)
+	require.Equal(t, "multicastjoinmessage", n1Ins[1].Msg.Type)
+	multicastJoinMsg := z.GetMulticastJoinMessage(t, n1Ins[1].Msg)
+	require.Equal(t, "streamconnectmessage", multicastJoinMsg.Message.Type)
+
+	//// Node 2 should have received:
+	// 1. 	Rumor(StreamStartMessage)
+	// 2. 	StreamAcceptMessage
+	// 3.   MulticastMessage(StreamData)
+	// 4.   MulticastMessage(StreamData)
+	// 5.   MulticastMessage(StreamData)
+
+	n2Ins := node2.GetIns()
+	require.Len(t, n2Ins, 5)
+
+	require.Equal(t, "rumor", n2Ins[0].Msg.Type)
+	rumors = z.GetRumor(t, n2Ins[0].Msg)
+	require.Len(t, rumors.Rumors, 1)
+	require.Equal(t, "streamstartmessage", rumors.Rumors[0].Msg.Type)
+	require.Equal(t, "streamacceptmessage", n2Ins[1].Msg.Type)
+
+	require.Equal(t, "multicastmessage", n2Ins[2].Msg.Type)
+	multicastMsg = z.GetMulticastMessage(t, n2Ins[2].Msg)
+	require.Equal(t, "streamdatamessage", multicastMsg.Message.Type)
+
+	require.Equal(t, "multicastmessage", n2Ins[3].Msg.Type)
+	multicastMsg = z.GetMulticastMessage(t, n2Ins[3].Msg)
+	require.Equal(t, "streamdatamessage", multicastMsg.Message.Type)
+
+	require.Equal(t, "multicastmessage", n2Ins[4].Msg.Type)
+	multicastMsg = z.GetMulticastMessage(t, n2Ins[4].Msg)
+	require.Equal(t, "streamdatamessage", multicastMsg.Message.Type)
+
+	streamMsgs, errC := node2.GetNextChunks(streamID, 3)
+	require.NoError(t, errC)
+	leftInd := 0
+	for ind, msg := range streamMsgs {
+		require.Equal(t, msg.StreamInfo.Name, fileName)
+		require.Equal(t, msg.StreamInfo.Price, uint(price))
+		require.Equal(t, msg.StreamInfo.CurrentlyWatching, uint(1))
+		require.Equal(t, msg.StreamInfo.Grade, 0.0)
+		require.Equal(t, msg.Data.Chunk, chunks[ind])
+		require.Equal(t, msg.Data.StartIndex, uint(leftInd))
+		leftInd = leftInd + len(chunks[ind])
+	}
+
+	// Node 2 should have sent:
+	// 1.	Ack
+	// 2. 	MulticastJoinMessage(StreamJoinMessage)
+	n2Outs := node2.GetOuts()
+	require.Len(t, n2Outs, 2)
+	require.Equal(t, "ack", n2Outs[0].Msg.Type)
+	require.Equal(t, "multicastjoinmessage", n2Outs[1].Msg.Type)
+	multicastJoinMsg = z.GetMulticastJoinMessage(t, n2Outs[1].Msg)
+	require.Equal(t, "streamconnectmessage", multicastJoinMsg.Message.Type)
+
+	// Announce end of streaming
+	err = node1.AnnounceStopStreaming(streamID)
+	require.NoError(t, err)
+
+	// Error should be thrown on a stream that does not exist
+	clients, err = node1.GetClients(streamID)
+	require.Error(t, err)
+	log.Info().Msgf("Test Done")
+}
+
+func Test_Project_FFMPG4_Stream(t *testing.T) {
+	transp := channel.NewTransport()
+	chunkSize := uint(12 * 1024 * 1024) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
 	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
@@ -278,7 +430,7 @@ func Test_Project_FFMPG4_Stream(t *testing.T) {
 	movieName := "file"
 	price := 10
 
-	streamID, err := node1.AnnounceStreaming(movieName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(movieName, uint(price))
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -367,7 +519,7 @@ func Test_Project_RelayedStream(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStreaming(fileName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -545,7 +697,7 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStreaming(fileName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
 	require.NoError(t, err)
 
 	// Wait for announcement to finish

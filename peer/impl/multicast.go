@@ -34,6 +34,13 @@ func (s *MulticastInfo) addMulticastClient(streamID string, client string) error
 	return nil
 }
 
+func (s *MulticastInfo) unregisterMulticastStream(streamID string) {
+	// Acquire lock
+	s.multicastMutex.Lock()
+	defer s.multicastMutex.Unlock()
+	delete(s.mapMulticastClients, streamID)
+}
+
 func (s *MulticastInfo) GetMulticastClients(streamID string) ([]string, error) {
 	// Acquire lock
 	s.multicastMutex.Lock()
@@ -122,6 +129,25 @@ func (n *node) JoinMulticast(streamID string, streamerID string, msg *transport.
 	return nil
 }
 
+func (n *node) StopMulticast(streamID string, message transport.Message) error {
+	// Craft MulticastStopMessage
+	multicastStopMsg := types.MulticastStopMessage{
+		ID:      streamID,
+		Message: &message,
+	}
+	// Marshall
+	transportMsg, errM := n.conf.MessageRegistry.MarshalMessage(multicastStopMsg)
+	if errM != nil {
+		return errM
+	}
+	// Broadcast
+	err := n.Broadcast(transportMsg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // /////// CALLBACKS ////////////////////////////////////////
 func (n *node) multicastMessageCallback(msg types.Message, pkt transport.Packet) error {
 	multicastMsg, ok := msg.(*types.MulticastMessage)
@@ -140,7 +166,26 @@ func (n *node) multicastMessageCallback(msg types.Message, pkt transport.Packet)
 	errPr := n.conf.MessageRegistry.ProcessPacket(pkt)
 	if errPr != nil {
 		log.Error().Msgf("[%s] multicastMessageCallback: Error in processing inner msg: %s",
-			n.conf.Socket.GetAddress(), err.Error())
+			n.conf.Socket.GetAddress(), errPr.Error())
+	}
+	return nil
+}
+
+func (n *node) multicastStopMessageCallback(msg types.Message, pkt transport.Packet) error {
+	multicastMsg, ok := msg.(*types.MulticastStopMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to MulticastStopMessage message got wrong type: %T", msg)
+	}
+	// Deallocate resources for multicast
+	n.multicstInfo.unregisterMulticastStream(multicastMsg.ID)
+
+	// Handle embedded message
+	pkt = pkt.Copy()
+	pkt.Msg = multicastMsg.Message
+	errPr := n.conf.MessageRegistry.ProcessPacket(pkt)
+	if errPr != nil {
+		log.Error().Msgf("[%s] multicastStopMessageCallback: Error in processing inner msg: %s",
+			n.conf.Socket.GetAddress(), errPr.Error())
 	}
 	return nil
 }
@@ -178,7 +223,7 @@ func (n *node) multicastJoinMessageCallback(msg types.Message, pkt transport.Pac
 		errPr := n.conf.MessageRegistry.ProcessPacket(pkt)
 		if errPr != nil {
 			log.Error().Msgf("[%s] multicastJoinMessageCallback: Error in processing inner msg: %s",
-				n.conf.Socket.GetAddress(), err.Error())
+				n.conf.Socket.GetAddress(), errPr.Error())
 		}
 
 	}

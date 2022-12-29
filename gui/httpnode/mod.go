@@ -95,6 +95,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 
 	mux.Handle("/blockchain", http.HandlerFunc(blockchain.BlockchainHandler()))
 
+	mux.Handle("/filesharing/blockchain", http.HandlerFunc(blockchain.GetFilesOnBlockchainHandler()))
 	mux.Handle(
 		"/video/",
 		http.StripPrefix(

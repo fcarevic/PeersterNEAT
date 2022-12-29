@@ -21,6 +21,11 @@ import (
 	"strings"
 )
 
+type PKIInfo struct {
+	privateKey *rsa.PrivateKey
+	publicKey  *rsa.PublicKey
+}
+
 type ChainBlock struct {
 	senderPublicKey   *rsa.PublicKey
 	senderAddress     string

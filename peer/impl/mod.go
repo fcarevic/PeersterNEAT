@@ -1,7 +1,6 @@
 package impl
 
 import (
-	"crypto/rsa"
 	"errors"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
@@ -73,6 +72,11 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			chunkMap:        NewAtomicChunkMap(),
 			chunkChannelMap: NewAtomicChannelTable(),
 		},
+		// PROJECT Peja
+		pkiInfo: PKIInfo{
+			privateKey: nil,
+			publicKey:  nil,
+		},
 	}
 
 	// Add self-address to routing table
@@ -87,8 +91,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			log.Error().Msgf("pkiInit error", err)
 			return nil
 		}
-		n.publicKey = publicKey
-		n.privateKey = privateKey
+		n.pkiInfo = PKIInfo{privateKey, publicKey}
 	} else {
 		n.conf.MessageRegistry.RegisterMessageCallback(types.ConfidentialityMessage{}, n.ProcessConfidentialityMessage)
 	}
@@ -138,8 +141,7 @@ type node struct {
 	crowdsInfo CrowdsInfo
 
 	// PKI
-	publicKey  *rsa.PublicKey
-	privateKey *rsa.PrivateKey
+	pkiInfo PKIInfo
 
 	// routing
 	routingTable peer.RoutingTable

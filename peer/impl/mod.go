@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"crypto/rsa"
 	"errors"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
@@ -75,6 +76,19 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 
 	n.CrowdsInit(conf) // PROJECT Naca
 
+	// PROJECT Peja
+	if n.conf.AntiEntropyInterval != 0 {
+		publicKey, privateKey, err := n.PkiInit(n.conf.Socket.GetAddress(), 100)
+		if err != nil {
+			log.Error().Msgf("pkiInit error", err)
+			return nil
+		}
+		n.publicKey = publicKey
+		n.privateKey = privateKey
+	} else {
+		n.conf.MessageRegistry.RegisterMessageCallback(types.ConfidentialityMessage{}, n.ProcessConfidentialityMessage)
+	}
+
 	// Register callbacks
 	n.conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, n.chatMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.RumorsMessage{}, n.RumorMessageCallback)
@@ -118,6 +132,10 @@ type node struct {
 
 	// Crowds
 	crowdsInfo CrowdsInfo
+
+	// PKI
+	publicKey  *rsa.PublicKey
+	privateKey *rsa.PrivateKey
 
 	// routing
 	routingTable peer.RoutingTable

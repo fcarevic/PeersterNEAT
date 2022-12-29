@@ -49,3 +49,27 @@ func (sc MulticastJoinMessage) String() string {
 func (sc MulticastJoinMessage) HTML() string {
 	return sc.String()
 }
+
+// -----------------------------------------------------------------------------
+// MulticastStopMessage
+
+// NewEmpty implements types.Message.
+func (sc MulticastStopMessage) NewEmpty() Message {
+	return &MulticastStopMessage{}
+}
+
+// Name implements types.Message.
+func (sc MulticastStopMessage) Name() string {
+	return "multicaststopmessage"
+}
+
+// String implements types.Message.
+func (sc MulticastStopMessage) String() string {
+	return fmt.Sprintf("MulticastStopMessage{streamID:%s}",
+		sc.ID[:8])
+}
+
+// HTML implements types.Message.
+func (sc MulticastStopMessage) HTML() string {
+	return sc.String()
+}

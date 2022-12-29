@@ -11,6 +11,15 @@ type MulticastMessage struct {
 	Message *transport.Message
 }
 
+// MulticastStopMessage contains info about the stream
+type MulticastStopMessage struct {
+	// ID is the ID of the stream
+	ID string
+
+	// Message
+	Message *transport.Message
+}
+
 // MulticastJoinMessage contains info about the stream
 type MulticastJoinMessage struct {
 	// ID is the ID of the stream

@@ -29,7 +29,7 @@ type StreamDisconnectMessage struct {
 }
 
 // StreamStartMessage describes a message used to notify the start of the new stream.
-// Server send this message when they want to notify users about the end of the stream
+// Server send this message when they want to notify users about the start of the stream
 // - implements types.Message
 type StreamStartMessage struct {
 	// StreamID is an id of stream for disconnecting
@@ -38,6 +38,15 @@ type StreamStartMessage struct {
 	// streamInfo contains all information about the stream
 	StreamInfo StreamInfo
 	// StreamerID is the address of the streamer
+	StreamerID string
+}
+
+// StreamStopMessage describes a message used to notify the end of the stream.
+// Server send this message when they want to notify users about the end of the stream
+// - implements types.Message
+type StreamStopMessage struct {
+	// StreamID is an id of stream for disconnecting
+	StreamID   string
 	StreamerID string
 }
 

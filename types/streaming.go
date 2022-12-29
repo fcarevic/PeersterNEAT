@@ -145,3 +145,27 @@ func (sc StreamAcceptMessage) String() string {
 func (sc StreamAcceptMessage) HTML() string {
 	return sc.String()
 }
+
+// -----------------------------------------------------------------------------
+// StreamStopMessage
+
+// NewEmpty implements types.Message.
+func (sc StreamStopMessage) NewEmpty() Message {
+	return &StreamStopMessage{}
+}
+
+// Name implements types.Message.
+func (sc StreamStopMessage) Name() string {
+	return "streamstopmessage"
+}
+
+// String implements types.Message.
+func (sc StreamStopMessage) String() string {
+	return fmt.Sprintf("StreamStopMessage{streamID:%s, streamer:%s}",
+		sc.StreamID[:8], sc.StreamerID)
+}
+
+// HTML implements types.Message.
+func (sc StreamStopMessage) HTML() string {
+	return sc.String()
+}

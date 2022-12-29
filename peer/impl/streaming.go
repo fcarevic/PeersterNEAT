@@ -191,7 +191,7 @@ func (n *node) Stream(data io.Reader, name string, price uint, streamID string) 
 	return nil
 }
 
-func (n *node) AnnounceStreaming(name string, price uint) (stringID string, err error) {
+func (n *node) AnnounceStartStreaming(name string, price uint) (stringID string, err error) {
 	// 1. Streamer generates the unique streamID
 	streamID := xid.New().String()
 
@@ -267,7 +267,7 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 	for {
 		time.Sleep(STREAMSLEEPTIME)
 
-		chunk := make([]byte, MULTICASTCHUNKSIZE)
+		chunk := make([]byte, n.conf.ChunkSize)
 		numBytes, errRead := data.Read(chunk)
 		if errRead != nil && errRead != io.EOF {
 			log.Error().Msgf("[%s]: stream: error while reading the file: %s",
@@ -365,12 +365,35 @@ func (n *node) ConnectToStream(streamID string, streamerID string) error {
 	return n.JoinMulticast(streamID, streamerID, &transportMsg)
 }
 
-// Stop the stream
-//StopStreaming(streamID string) error
-
 // Returns the number of connected streamers for chosen stream
 func (n *node) GetClients(streamID string) ([]string, error) {
 	return n.streamInfo.getClients(streamID)
+}
+
+// Stop the stream
+func (n *node) AnnounceStopStreaming(streamID string) error {
+
+	_, errC := n.streamInfo.getClients(streamID)
+	if errC != nil {
+		return errC
+	}
+	n.streamInfo.unregisterStreaming(streamID)
+	// Craft StopStreamingMessage
+	stopStreamMsg := types.StreamStopMessage{
+		StreamID:   streamID,
+		StreamerID: n.conf.Socket.GetAddress(),
+	}
+
+	// Marshall msg
+	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(stopStreamMsg)
+	if errMarshall != nil {
+		return errMarshall
+	}
+	err := n.StopMulticast(streamID, transportMsg)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ///////////////////////// CALLBACKS ////////////////////////////////////
@@ -467,6 +490,18 @@ func (n *node) streamAcceptMessageCallback(msg types.Message, pkt transport.Pack
 		return errDecr
 	}
 	err := n.streamInfo.registerListening(streamAcceptMsg.StreamID, key)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (n *node) streamStopMessageCallback(msg types.Message, pkt transport.Packet) error {
+	streamStopMsg, ok := msg.(*types.StreamStopMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to StreamStopMessage message got wrong type: %T", msg)
+	}
+	err := n.streamInfo.unregisterListening(streamStopMsg.StreamID)
 	if err != nil {
 		return err
 	}

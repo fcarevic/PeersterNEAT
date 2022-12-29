@@ -8,6 +8,7 @@ import (
 	"go.dedis.ch/cs438/types"
 	"golang.org/x/xerrors"
 	"math/rand"
+	"os"
 	"strings"
 )
 
@@ -18,22 +19,23 @@ type CrowdsInfo struct {
 
 /*
  */
-func (n *node) StartCrowds(peers []string, isFileRequest bool, content, finalDst string) ([]byte, error) {
-	if !isFileRequest {
-		crowdsMessagingReqMsgMarshalled, err := n.CreateCrowdsMessagingRequest(finalDst, content)
-		if err != nil {
-			return nil, err
-		}
-
-		err = n.SendCrowdsMessage(&crowdsMessagingReqMsgMarshalled, peers)
-		return []byte(""), nil
+func (n *node) CrowdsSend(peers []string, body, to string) error {
+	crowdsMessagingReqMsgMarshalled, err := n.CreateCrowdsMessagingRequest(to, body)
+	if err != nil {
+		return err
 	}
 
+	err = n.SendCrowdsMessage(&crowdsMessagingReqMsgMarshalled, peers)
+	return nil
+}
+
+func (n *node) CrowdsDownload(peers []string, filename string) ([]byte, error) {
 	requestID := xid.New().String()
 	reqChannel := make(chan string)
 	n.crowdsInfo.chunkChannelMap.StoreChannel(requestID, reqChannel)
 
-	crowdsDownloadReqMsgMarshalled, err := n.CreateCrowdsDownloadRequest(requestID, content)
+	metahash := n.Resolve(filename)
+	crowdsDownloadReqMsgMarshalled, err := n.CreateCrowdsDownloadRequest(requestID, metahash)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +51,13 @@ func (n *node) StartCrowds(peers []string, isFileRequest bool, content, finalDst
 			return []byte(""), nil
 
 		case <-reqChannel:
-			return n.crowdsInfo.chunkMap.GetFile(requestID), nil
+			file := n.crowdsInfo.chunkMap.GetFile(requestID)
+			err = os.WriteFile("./downloaded_"+filename, file, 0644)
+			if err != nil {
+				log.Error().Msgf("error while writing file to disc %s", err)
+			}
+
+			return file, nil
 		}
 	}
 }

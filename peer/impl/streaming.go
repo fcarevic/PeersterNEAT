@@ -18,7 +18,7 @@ type StreamInfo struct {
 	// Attributes
 	mapClients       map[string][]string
 	mapListening     map[string][]types.StreamMessage
-	availableStreams []string
+	availableStreams []types.StreamInfo
 
 	// Encryption
 	mapKeysListening map[string][]byte
@@ -399,22 +399,29 @@ func (n *node) AnnounceStopStreaming(streamID string) error {
 	return nil
 }
 
-func (s *StreamInfo) registerAvailableStream(streamID string) {
+func (s *StreamInfo) registerAvailableStream(stream types.StreamInfo) {
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
-	s.availableStreams = append(s.availableStreams, streamID)
+	s.availableStreams = append(s.availableStreams, stream)
 }
 
 func (s *StreamInfo) unregisterAvailableStream(streamID string) {
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
-	s.availableStreams = remove[string](s.availableStreams, streamID)
+	tmp := make([]types.StreamInfo, 0)
+	for _, inf := range s.availableStreams {
+		if inf.StreamID == streamID {
+			continue
+		}
+		tmp = append(tmp, inf)
+	}
+	s.availableStreams = tmp
 }
 
-func (n *node) GetAllStreams() []string {
+func (n *node) GetAllStreams() []types.StreamInfo {
 	n.streamInfo.streamInfoMutex.Lock()
 	defer n.streamInfo.streamInfoMutex.Unlock()
-	tmp := make([]string, len(n.streamInfo.availableStreams))
+	tmp := make([]types.StreamInfo, len(n.streamInfo.availableStreams))
 	copy(tmp, n.streamInfo.availableStreams)
 	return tmp
 }
@@ -537,7 +544,7 @@ func (n *node) streamStartMessageCallback(msg types.Message, pkt transport.Packe
 	if !ok {
 		return xerrors.Errorf("Failed to cast to StreamStopMessage message got wrong type: %T", msg)
 	}
-	n.streamInfo.registerAvailableStream(streamStartMsg.StreamID)
+	n.streamInfo.registerAvailableStream(streamStartMsg.StreamInfo)
 	return nil
 }
 

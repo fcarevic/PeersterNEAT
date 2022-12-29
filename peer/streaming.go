@@ -37,5 +37,5 @@ type Streaming interface {
 	ReceiveFFMPG4(streamID string, dir string) error
 
 	// GetAllStreams returns all available streams in the network
-	GetAllStreams() []string
+	GetAllStreams() []types.StreamInfo
 }

@@ -59,6 +59,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			mapClients:       make(map[string][]string),
 			mapKeysListening: make(map[string][]byte),
 			mapListening:     make(map[string][]types.StreamMessage),
+			availableStreams: make([]types.StreamInfo, 0),
 		},
 		multicstInfo: MulticastInfo{
 			mapMulticastClients: make(map[string][]string),

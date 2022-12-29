@@ -1,11 +1,13 @@
 package unit
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	z "go.dedis.ch/cs438/internal/testing"
 	"go.dedis.ch/cs438/transport/channel"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -37,7 +39,7 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 	}
 	finalNode := nodes[numNodes-1]
 
-	_, err := nodes[0].StartCrowds(trustedPeers, false, "hey there :)", finalNode.GetAddr())
+	err := nodes[0].CrowdsSend(trustedPeers, "hey there :)", finalNode.GetAddr())
 	require.NoError(t, err)
 
 	time.Sleep(time.Second * 2)
@@ -126,9 +128,86 @@ func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	trustedPeers[1] = node1.GetAddr()
 	trustedPeers[2] = node3.GetAddr()
 
-	buf, err := node0.StartCrowds(trustedPeers, true, mh, node0.GetAddr())
+	buf, err := node0.CrowdsDownload(trustedPeers, mh)
 	require.NoError(t, err)
 	require.Equal(t, data, buf)
+
+	time.Sleep(time.Second * 2)
+
+	log.Info().Msgf("Izvolte rezultati: ")
+	log.Info().Msgf("rez node %x: %s %s", 0, node0.GetIns(), node0.GetOuts())
+	log.Info().Msgf("rez node %x: %s %s", 1, node1.GetIns(), node1.GetOuts())
+	log.Info().Msgf("rez node %x: %s %s", 2, node2.GetIns(), node2.GetOuts())
+	log.Info().Msgf("rez node %x: %s %s", 3, node3.GetIns(), node3.GetOuts())
+}
+
+// A wants to download file via crowds...
+// A <-> B <-> C <-> D
+func Test_FILES(t *testing.T) {
+	transp := channel.NewTransport()
+
+	chunkSize := uint(8192 * 10) // The metafile can handle just 3 chunks
+
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4), z.WithPaxosID(1))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4))
+	defer node0.Stop()
+	defer node1.Stop()
+	defer node2.Stop()
+	defer node3.Stop()
+
+	node0.AddPeer(node1.GetAddr())
+	node1.AddPeer(node0.GetAddr())
+	node1.AddPeer(node2.GetAddr())
+	node2.AddPeer(node1.GetAddr())
+	node2.AddPeer(node3.GetAddr())
+	node3.AddPeer(node2.GetAddr())
+
+	node0.SetRoutingEntry(node3.GetAddr(), node1.GetAddr())
+	node0.SetRoutingEntry(node2.GetAddr(), node1.GetAddr())
+	node1.SetRoutingEntry(node3.GetAddr(), node2.GetAddr())
+	node2.SetRoutingEntry(node0.GetAddr(), node1.GetAddr())
+	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
+	node3.SetRoutingEntry(node0.GetAddr(), node2.GetAddr())
+
+	filename := "proba.mp4"
+	file, err := os.Open(filename)
+	mh, err := node2.Upload(bufio.NewReader(file))
+	if err != nil {
+		log.Error().Msgf("greska u uupload %s", err)
+	}
+	log.Info().Msgf("tagging metahash %s with name %s", mh, filename)
+
+	node2.Tag(filename, mh)
+	time.Sleep(time.Second * 5)
+	mhNew := node0.Resolve(filename)
+	log.Info().Msgf("metahash resolved %s vs original %s", mhNew, mh)
+
+	storage := node2.GetStorage().GetDataBlobStore()
+	storage.ForEach(func(key string, val []byte) bool {
+		node0.UpdateCatalog(key, node2.GetAddr())
+		node1.UpdateCatalog(key, node2.GetAddr())
+		node3.UpdateCatalog(key, node2.GetAddr())
+		return true
+	})
+	node0.UpdateCatalog(mh, node2.GetAddr())
+	node1.UpdateCatalog(mh, node2.GetAddr())
+	node3.UpdateCatalog(mh, node2.GetAddr())
+
+	numTrustedPeers := 3
+	trustedPeers := make([]string, numTrustedPeers)
+	trustedPeers[0] = node0.GetAddr()
+	trustedPeers[1] = node1.GetAddr()
+	trustedPeers[2] = node3.GetAddr()
+
+	log.Info().Msgf("pre crowds: ")
+	buf, err := node0.CrowdsDownload(trustedPeers, filename)
+	require.NoError(t, err)
+	f, err := os.ReadFile(filename)
+	require.Equal(t, f, buf)
+
+	log.Info().Msgf("pre sleepa: ")
 
 	time.Sleep(time.Second * 2)
 

@@ -61,7 +61,7 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStartStreaming("file1", 10)
+	streamID, err := node1.AnnounceStartStreaming("file1", 10, []byte{})
 	require.NoError(t, err)
 
 	// Wait for announcement and at least one packet to be sent
@@ -71,7 +71,7 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, clients, 0)
 
-	errStream := node1.Stream(buf, "file1", 10, streamID)
+	errStream := node1.Stream(buf, "file1", 10, streamID, []byte{})
 	require.NoError(t, errStream)
 
 	// Wait for stream to finish
@@ -147,7 +147,7 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price), []byte{})
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -163,7 +163,7 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	require.Len(t, clients, 1)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID)
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
 	require.NoError(t, err)
 
 	// Wait for stream to finish
@@ -292,7 +292,7 @@ func Test_Project_SimpleStream(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price), []byte{})
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -308,7 +308,7 @@ func Test_Project_SimpleStream(t *testing.T) {
 	require.Len(t, clients, 1)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID)
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
 	require.NoError(t, err)
 
 	// Wait for stream to finish
@@ -430,7 +430,7 @@ func Test_Project_FFMPG4_Stream(t *testing.T) {
 	movieName := "file"
 	price := 10
 
-	streamID, err := node1.AnnounceStartStreaming(movieName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(movieName, uint(price), []byte{})
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -448,7 +448,7 @@ func Test_Project_FFMPG4_Stream(t *testing.T) {
 	// Stream
 	manifestName := "filename.m3u8"
 	dir := "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/video"
-	node1.StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID)
+	node1.StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID, []byte{})
 	time.Sleep(3 * time.Second)
 
 	// Node2 Should received all chunks
@@ -519,7 +519,7 @@ func Test_Project_RelayedStream(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price), []byte{})
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -535,7 +535,7 @@ func Test_Project_RelayedStream(t *testing.T) {
 	require.Len(t, clients, 1)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID)
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
 	require.NoError(t, err)
 
 	// Wait for stream to finish
@@ -697,7 +697,7 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 
 	buf := bytes.NewBuffer(data)
 
-	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price))
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price), []byte{})
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
@@ -716,7 +716,7 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	require.Len(t, clients, 2)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID)
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
 	require.NoError(t, err)
 
 	// Wait for stream to finish

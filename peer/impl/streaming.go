@@ -172,7 +172,7 @@ func (s *StreamInfo) addStreamingKey(streamID string, key []byte) error {
 }
 
 // Starts streaming of provided file. returns the ID of stream.
-func (n *node) Stream(data io.Reader, name string, price uint, streamID string) (err error) {
+func (n *node) Stream(data io.Reader, name string, price uint, streamID string, thumbnail []byte) (err error) {
 
 	// Get symmetric key
 	symmetricKey, errK := n.streamInfo.getSymmetricKey(streamID)
@@ -187,12 +187,13 @@ func (n *node) Stream(data io.Reader, name string, price uint, streamID string) 
 		Grade:             0,
 		Price:             price,
 		CurrentlyWatching: 0,
+		Thumbnail:         thumbnail,
 	}
 	n.stream(data, streamInfo, symmetricKey)
 	return nil
 }
 
-func (n *node) AnnounceStartStreaming(name string, price uint) (stringID string, err error) {
+func (n *node) AnnounceStartStreaming(name string, price uint, thumbnail []byte) (stringID string, err error) {
 	// 1. Streamer generates the unique streamID
 	streamID := xid.New().String()
 
@@ -220,6 +221,7 @@ func (n *node) AnnounceStartStreaming(name string, price uint) (stringID string,
 		Grade:             0,
 		Price:             price,
 		CurrentlyWatching: 0,
+		Thumbnail:         thumbnail,
 	}
 
 	errB := n.broadcastStartStreaming(streamInfo)
@@ -537,4 +539,13 @@ func (n *node) streamStartMessageCallback(msg types.Message, pkt transport.Packe
 	}
 	n.streamInfo.registerAvailableStream(streamStartMsg.StreamID)
 	return nil
+}
+
+// Init
+func (n *node) StreamingInit() {
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamDataMessage{}, n.streamDataMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamAcceptMessage{}, n.streamAcceptMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamConnectMessage{}, n.streamConnectMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamStartMessage{}, n.streamStartMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamStopMessage{}, n.streamStopMessageCallback)
 }

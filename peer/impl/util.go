@@ -178,6 +178,9 @@ func serializeStreamMsg(msg types.StreamMessage) []byte {
 	str = str + strconv.Itoa(int(msg.StreamInfo.CurrentlyWatching))
 	str = str + peer.MetafileSep
 
+	str = str + hex.EncodeToString(msg.StreamInfo.Thumbnail)
+	str = str + peer.MetafileSep
+
 	str = str + hex.EncodeToString(msg.Data.Chunk)
 	str = str + peer.MetafileSep
 
@@ -214,16 +217,22 @@ func deserializeStreamMsg(serialized string) (types.StreamMessage, error) {
 	}
 	streamInfo.CurrentlyWatching = uint(currWatch)
 
-	chunk, errChunk := hex.DecodeString(splits[5])
+	thumbnail, errChunk := hex.DecodeString(splits[5])
+	if errChunk != nil {
+		return types.StreamMessage{}, errChunk
+	}
+	streamInfo.Thumbnail = thumbnail
+
+	chunk, errChunk := hex.DecodeString(splits[6])
 	if errChunk != nil {
 		return types.StreamMessage{}, errChunk
 	}
 
-	startIndex, errSI := strconv.Atoi(splits[6])
+	startIndex, errSI := strconv.Atoi(splits[7])
 	if errSI != nil {
 		return types.StreamMessage{}, errSI
 	}
-	endIndex, errEI := strconv.Atoi(splits[7])
+	endIndex, errEI := strconv.Atoi(splits[8])
 	if errEI != nil {
 		return types.StreamMessage{}, errEI
 	}

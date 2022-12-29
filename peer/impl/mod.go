@@ -63,7 +63,10 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		multicstInfo: MulticastInfo{
 			mapMulticastClients: make(map[string][]string),
 		},
-
+		chatInfo: ChatInfo{
+			sentMessages:     make([]peer.ChatMessageInfo, 0),
+			receivedMessages: make([]peer.ChatMessageInfo, 0),
+		},
 		// PROJECT Naca
 		crowdsInfo: CrowdsInfo{
 			chunkMap:        NewAtomicChunkMap(),
@@ -89,6 +92,10 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		n.conf.MessageRegistry.RegisterMessageCallback(types.ConfidentialityMessage{}, n.ProcessConfidentialityMessage)
 	}
 
+	// Project
+	n.MulticastInit()
+	n.StreamingInit()
+
 	// Register callbacks
 	n.conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, n.chatMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.RumorsMessage{}, n.RumorMessageCallback)
@@ -106,13 +113,6 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
 
-	// Project
-	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastMessage{}, n.multicastMessageCallback)
-	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastJoinMessage{}, n.multicastJoinMessageCallback)
-	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamDataMessage{}, n.streamDataMessageCallback)
-	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamAcceptMessage{}, n.streamAcceptMessageCallback)
-	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamConnectMessage{}, n.streamConnectMessageCallback)
-
 	return &n
 }
 
@@ -129,6 +129,9 @@ type node struct {
 
 	// Mulitcast
 	multicstInfo MulticastInfo
+
+	// Chatting
+	chatInfo ChatInfo
 
 	// Crowds
 	crowdsInfo CrowdsInfo

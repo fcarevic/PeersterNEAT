@@ -10,10 +10,10 @@ const STREAMINGSIZE = 65536
 // Streaming describes functions used in multicast streaming
 type Streaming interface {
 	// AnnounceStartStreaming starts streaming of provided file, returns the ID of stream.
-	AnnounceStartStreaming(name string, price uint) (stringID string, err error)
+	AnnounceStartStreaming(name string, price uint, thumbnail []byte) (stringID string, err error)
 
 	// StartStreaming starts streaming of provided file, returns the ID of stream.
-	Stream(data io.Reader, name string, price uint, streamID string) (err error)
+	Stream(data io.Reader, name string, price uint, streamID string, thumbnail []byte) (err error)
 
 	// AnnounceStopStreaming stops the stream, returns and error if the stream does not exist
 	AnnounceStopStreaming(streamID string) error
@@ -31,7 +31,7 @@ type Streaming interface {
 	GetNextChunks(streamID string, numberOfChunks int) ([]types.StreamMessage, error)
 
 	// StreamFFMPG4 streams video clips
-	StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string)
+	StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string, thumbnail []byte)
 
 	// ReceiveFFMPG4 receives and decodes video clips
 	ReceiveFFMPG4(streamID string, dir string) error

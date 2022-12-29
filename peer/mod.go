@@ -14,6 +14,8 @@ type Peer interface {
 	Messaging
 	DataSharing
 	Streaming
+	Multicast
+	Chatting
 
 	// PROJECT NACA
 	Crowds

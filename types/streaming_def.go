@@ -100,8 +100,11 @@ type StreamInfo struct {
 	// Grade presents the average grade so far for this stream
 	Grade float64
 
-	// CurrentlyWatching presents the number of users currently watching the strea,
+	// CurrentlyWatching presents the number of users currently watching the stream
 	CurrentlyWatching uint
+
+	// Thumbnail
+	Thumbnail []byte
 }
 
 type StreamData struct {

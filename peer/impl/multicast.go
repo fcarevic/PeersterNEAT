@@ -229,3 +229,10 @@ func (n *node) multicastJoinMessageCallback(msg types.Message, pkt transport.Pac
 	}
 	return nil
 }
+
+// Init
+func (n *node) MulticastInit() {
+	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastMessage{}, n.multicastMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastJoinMessage{}, n.multicastJoinMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastStopMessage{}, n.multicastStopMessageCallback)
+}

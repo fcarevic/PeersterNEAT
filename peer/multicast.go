@@ -20,10 +20,4 @@ type Multicast interface {
 
 	// StopMulticast announce that the stream has ended.
 	StopMulticast(streamID string, message transport.Message) error
-
-	// StreamFFMPG4 streams video clips
-	StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string)
-
-	// ReceiveFFMPG4 receives and decodes video clips
-	ReceiveFFMPG4(streamID string, dir string) error
 }

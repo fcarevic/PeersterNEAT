@@ -52,38 +52,12 @@ func (c *ChatInfo) RegisterReceivedMessage(msg string, to string, from string) {
 	c.sentMessages = append(c.receivedMessages, chatMsg)
 }
 
-func (c *ChatInfo) GetSentChatMessages() []peer.ChatMessageInfo {
-	c.chatInfoMutex.Lock()
-	defer c.chatInfoMutex.Unlock()
-	tmp := make([]peer.ChatMessageInfo, len(c.sentMessages))
-	copy(tmp, c.sentMessages)
-	return tmp
-}
-
-func (c *ChatInfo) GetReceivedChatMessages() []peer.ChatMessageInfo {
-	c.chatInfoMutex.Lock()
-	defer c.chatInfoMutex.Unlock()
-	tmp := make([]peer.ChatMessageInfo, len(c.receivedMessages))
-	copy(tmp, c.sentMessages)
-	return tmp
-}
-
-func (c *ChatInfo) RegisterSentMessage(msg string, to string, from string) {
-	chatMsg := peer.ChatMessageInfo{
-		Message:  msg,
-		Receiver: to,
-		Sender:   from,
-	}
-	c.chatInfoMutex.Lock()
-	defer c.chatInfoMutex.Unlock()
-	c.sentMessages = append(c.sentMessages, chatMsg)
-}
 func (n *node) RegisterReceivedMessage(msg string, from string) {
-	return n.chatInfo.RegisterReceivedMessage(msg, n.conf.Socket.GetAddress(), from)
+	n.chatInfo.RegisterReceivedMessage(msg, n.conf.Socket.GetAddress(), from)
 }
 
 func (n *node) RegisterSentMessage(msg string, to string) {
-	return n.chatInfo.RegisterSentMessage(msg, to, n.conf.Socket.GetAddress())
+	n.chatInfo.RegisterSentMessage(msg, to, n.conf.Socket.GetAddress())
 }
 
 func (n *node) GetReceivedChatMessages() []peer.ChatMessageInfo {

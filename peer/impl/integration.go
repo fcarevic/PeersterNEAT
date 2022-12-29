@@ -24,7 +24,8 @@ func (s *StreamInfo) getGrade(streamID string) (float64, error) {
 	return 0, nil
 }
 
-func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string) {
+func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string,
+	thumbnail []byte) {
 	file, err := os.Open(dir + "/" + manifestName)
 	if err != nil {
 		log.Error().Msgf("%s", err.Error())
@@ -55,7 +56,7 @@ func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price 
 			nextLine := s.Text()
 			encoded = command + peer.MetafileSep + nextLine
 		}
-		err = n.Stream(strings.NewReader(encoded), name, price, streamID)
+		err = n.Stream(strings.NewReader(encoded), name, price, streamID, thumbnail)
 		if err != nil {
 			return
 		}

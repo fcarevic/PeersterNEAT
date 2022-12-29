@@ -2,6 +2,8 @@ package controller
 
 import (
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"text/template"
 
@@ -35,43 +37,45 @@ func (b blockchain) BlockchainHandler() http.HandlerFunc {
 	}
 }
 
+func (b blockchain) GetFilesOnBlockchainHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			store := b.conf.Storage.GetBlockchainStore()
+
+			blocks, err := b.getBlocks(store)
+			if err != nil {
+				http.Error(w, "failed to unmarshal block: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+
+			js, err := json.MarshalIndent(&blocks, "", "\t")
+			if err != nil {
+				http.Error(
+					w, fmt.Sprintf("failed to marshal catalog: %v", err),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			w.Write(js)
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
 func (b blockchain) blockchainGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-
 	store := b.conf.Storage.GetBlockchainStore()
 
-	lastBlockHashHex := hex.EncodeToString(store.Get(storage.LastBlockKey))
-	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
-
-	if lastBlockHashHex == "" {
-		lastBlockHashHex = endBlockHasHex
+	blocks, err := b.getBlocks(store)
+	if err != nil {
+		http.Error(w, "failed to unmarshal block: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-
-	blocks := []viewBlock{}
-
-	for lastBlockHashHex != endBlockHasHex {
-		lastBlockBuf := store.Get(string(lastBlockHashHex))
-
-		var lastBlock types.BlockchainBlock
-
-		err := lastBlock.Unmarshal(lastBlockBuf)
-		if err != nil {
-			http.Error(w, "failed to unmarshal block: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		blocks = append(blocks, viewBlock{
-			Index:    lastBlock.Index,
-			Hash:     hex.EncodeToString(lastBlock.Hash),
-			ValueID:  lastBlock.Value.UniqID,
-			Name:     lastBlock.Value.Filename,
-			Metahash: lastBlock.Value.Metahash,
-			PrevHash: hex.EncodeToString(lastBlock.PrevHash),
-		})
-
-		lastBlockHashHex = hex.EncodeToString(lastBlock.PrevHash)
-	}
-
 	viewData := struct {
 		NodeAddr      string
 		LastBlockHash string
@@ -89,6 +93,43 @@ func (b blockchain) blockchainGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tmpl.ExecuteTemplate(w, "blockchain.gohtml", viewData)
+}
+
+func (b blockchain) getBlocks(store storage.Store) ([]viewBlock, error) {
+	lastBlockHashHex := hex.EncodeToString(store.Get(storage.LastBlockKey))
+	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
+
+	if lastBlockHashHex == "" {
+		lastBlockHashHex = endBlockHasHex
+	}
+
+	blocks := []viewBlock{}
+
+	for lastBlockHashHex != endBlockHasHex {
+		lastBlockBuf := store.Get(string(lastBlockHashHex))
+
+		var lastBlock types.BlockchainBlock
+
+		err := lastBlock.Unmarshal(lastBlockBuf)
+		if err != nil {
+			return nil, err
+		}
+
+		blocks = append(
+			blocks, viewBlock{
+				Index:    lastBlock.Index,
+				Hash:     hex.EncodeToString(lastBlock.Hash),
+				ValueID:  lastBlock.Value.UniqID,
+				Name:     lastBlock.Value.Filename,
+				Metahash: lastBlock.Value.Metahash,
+				PrevHash: hex.EncodeToString(lastBlock.PrevHash),
+			},
+		)
+
+		lastBlockHashHex = hex.EncodeToString(lastBlock.PrevHash)
+	}
+
+	return blocks, nil
 }
 
 type viewBlock struct {

@@ -131,7 +131,7 @@ func (n *node) CrowdsMessageCallback(msg types.Message, pkt transport.Packet) er
 		return n.conf.MessageRegistry.ProcessPacket(transport.Packet{Header: pkt.Header, Msg: crowdsMsg.Msg})
 	}
 
-	// If rand <= then deliver message
+	// If rand > keep crowds msging
 	return n.SendCrowdsMessage(crowdsMsg.Msg, crowdsMsg.Recipients)
 }
 

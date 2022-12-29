@@ -138,8 +138,10 @@ func (d datasharing) downloadGet(w http.ResponseWriter, r *http.Request) {
 
 	res, err := d.node.Download(key)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to download: %v", err),
-			http.StatusBadRequest)
+		http.Error(
+			w, fmt.Sprintf("failed to download: %v", err),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
@@ -153,16 +155,20 @@ func (d datasharing) namingPost(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to read body: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to read body: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
 	arguments := [2]string{} // [name, metahash]
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -194,16 +200,20 @@ func (d datasharing) catalogPost(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to read body: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to read body: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
 	arguments := [2]string{} // [key, value]
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -217,6 +227,28 @@ func (d datasharing) catalogGet(w http.ResponseWriter, r *http.Request) {
 
 	js, err := json.MarshalIndent(&catalog, "", "\t")
 	if err != nil {
+		http.Error(
+			w, fmt.Sprintf("failed to marshal catalog: %v", err),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	w.Write(js)
+}
+
+/*
+func (d datasharing) getLocalCatalog(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	catalog := d.node.
+	localCatalog := make([]string, 0)
+	for metahash,
+
+	js, err := json.MarshalIndent(&catalog, "", "\t")
+	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to marshal catalog: %v", err),
 			http.StatusInternalServerError)
 		return
@@ -225,7 +257,7 @@ func (d datasharing) catalogGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	w.Write(js)
-}
+}*/
 
 // types.IndexArgument:
 //
@@ -239,30 +271,38 @@ func (d datasharing) indexPost(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to read body: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to read body: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
 	arguments := types.IndexArgument{}
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
 	regex, err := regexp.Compile(arguments.Pattern)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse regex: %v", err),
-			http.StatusBadRequest)
+		http.Error(
+			w, fmt.Sprintf("failed to parse regex: %v", err),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	wait, err := time.ParseDuration(arguments.Timeout)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse wait: %v", err),
-			http.StatusBadRequest)
+		http.Error(
+			w, fmt.Sprintf("failed to parse wait: %v", err),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
@@ -274,8 +314,10 @@ func (d datasharing) indexPost(w http.ResponseWriter, r *http.Request) {
 
 	js, err := json.Marshal(&names)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to marshal names: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to marshal names: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -296,39 +338,49 @@ func (d datasharing) searchPost(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to read body: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to read body: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
 	arguments := types.SearchArgument{}
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
 	regex, err := regexp.Compile(arguments.Pattern)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse regex: %v", err),
-			http.StatusBadRequest)
+		http.Error(
+			w, fmt.Sprintf("failed to parse regex: %v", err),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	timeout, err := time.ParseDuration(arguments.Timeout)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse wait: %v", err),
-			http.StatusBadRequest)
+		http.Error(
+			w, fmt.Sprintf("failed to parse wait: %v", err),
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	name, err := d.node.SearchFirst(*regex, peer.ExpandingRing{
-		Initial: arguments.Initial,
-		Factor:  arguments.Factor,
-		Retry:   arguments.Retry,
-		Timeout: timeout,
-	})
+	name, err := d.node.SearchFirst(
+		*regex, peer.ExpandingRing{
+			Initial: arguments.Initial,
+			Factor:  arguments.Factor,
+			Retry:   arguments.Retry,
+			Timeout: timeout,
+		},
+	)
 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to search: %v", err), http.StatusBadRequest)

@@ -11,6 +11,7 @@ type PKI interface {
 	PutInitialBlockOnChain(*rsa.PublicKey, string, float64) error
 	PkiInit(string, float64) (*rsa.PublicKey, *rsa.PrivateKey, error)
 	SendEncryptedMsg(transport.Message, *rsa.PublicKey) ([]byte, error)
+	DecryptedMsg([]byte, *rsa.PrivateKey) ([]byte, error)
 	ProcessConfidentialityMessage(types.Message, transport.Packet) error
 	GetPublicKey(string) (*rsa.PublicKey, error)
 	GetAmount(string) (float64, error)

@@ -4,11 +4,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha512"
+	"encoding/json"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	z "go.dedis.ch/cs438/internal/testing"
+	"go.dedis.ch/cs438/registry/standard"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/transport/channel"
+	"go.dedis.ch/cs438/types"
 	"testing"
 	"time"
 )
@@ -333,12 +336,17 @@ func Test_Project_Message_Encryption_Decryption(t *testing.T) {
 	time.Sleep(time.Second * 2)
 	log.Printf("sleep 2s pass")
 
-	plaintext := transport.Message{} // []byte("НЕРФ")
+	msgToSend := types.ChatMessage{Message: "hello world"}
+	expectedMsg, err := standard.NewRegistry().MarshalMessage(msgToSend)
+	require.NoError(t, err)
 	publicKey, err := nodes[1].GetPublicKey(nodes[0].GetAddr())
 	require.NoError(t, err)
-	ciphertext, err := nodes[1].SendEncryptedMsg(plaintext, publicKey)
+	cipherMsg, err := nodes[1].SendEncryptedMsg(expectedMsg, publicKey)
 	require.NoError(t, err)
-	plaintextDec, err := decryptMsg(ciphertext, privateKeyMy)
+	plaintextDec, err := nodes[0].DecryptedMsg(cipherMsg, privateKeyMy)
 	require.NoError(t, err)
-	require.Equal(t, plaintextDec, []uint8([]byte{0x9}))
+	var transportMsg transport.Message
+	err = json.Unmarshal(plaintextDec, &transportMsg)
+	require.NoError(t, err)
+	require.Equal(t, expectedMsg, transportMsg)
 }

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
+	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
@@ -170,32 +171,81 @@ func (n *node) EncryptMsg(msg transport.Message, key *rsa.PublicKey) (*types.Con
 
 	return &types.ConfidentialityMessage{CipherMessage: cipherMsg}, nil
 }
+
+//func (n *node) EncryptByte(msg []byte, key *rsa.PublicKey) ([]byte, error) {
+//	cipherMsg, err := encryptMsg(msg, key)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return cipherMsg, nil
+//}
+
 func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey) ([]byte, error) {
-	msgToSend, err := n.EncryptMsg(msg, publicKey)
+	buf, err := json.Marshal(&msg)
 	if err != nil {
 		return nil, err
 	}
-	buf, err := json.Marshal(&msgToSend)
+
+	key, err := generateNewAESKey()
 	if err != nil {
 		return nil, err
 	}
+
+	aesgcm, err := encryptAESGCM(key, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	encKey, err := encryptMsg(key, publicKey)
+	if err != nil {
+		return nil, err
+	}
+	msgToSend := types.ConfidentialityMessage{CipherMessage: []byte(
+		hex.EncodeToString(aesgcm) + peer.MetafileSep +
+			hex.EncodeToString(encKey))}
+
 	return msgToSend.CipherMessage, n.Broadcast(transport.Message{Type: msgToSend.Name(), Payload: buf})
+}
+func (n *node) DecryptedMsg(cipherMsg []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
+	tmps := strings.Split(string(cipherMsg), peer.MetafileSep)
+	aesgcm, err := hex.DecodeString(tmps[0])
+	if err != nil {
+		//log.Error().Msgf("hex DEC 1: %s", err.Error())
+		return nil, err
+	}
+	encKey, err := hex.DecodeString(tmps[1])
+	if err != nil {
+		//log.Error().Msgf("hex DEC2: %s", err.Error())
+		return nil, err
+	}
+	key, err := decryptMsg(encKey, privateKey)
+	if err != nil {
+		//log.Error().Msgf("RSA DEC: %s", err.Error())
+		return nil, err
+	}
+	bytes, err := decryptAESGCM(key, aesgcm)
+	if err != nil {
+		//log.Error().Msgf("gcm DEC: %s", err.Error())
+		return nil, err
+	}
+	return bytes, nil
 }
 
 func (n *node) ProcessConfidentialityMessage(msg types.Message, pkt transport.Packet) error {
 	var confMsg types.ConfidentialityMessage
 	err := json.Unmarshal(pkt.Msg.Payload, &confMsg)
 	if err != nil {
+		log.Error().Msgf("err unmarshall: %s", err.Error())
 		return err
 	}
-	plainMsg, err := decryptMsg(confMsg.CipherMessage, n.privateKey)
+	decryptedMsg, err := n.DecryptedMsg(confMsg.CipherMessage, n.privateKey)
 	if err != nil {
 		return err
 	}
-	// process plaintext further
-	// iz bajta u transport i process
-	transportMsg, err := transportFromString(string(plainMsg))
+	var transportMsg transport.Message
+	err = json.Unmarshal(decryptedMsg, &transportMsg)
 	if err != nil {
+		log.Error().Msgf("unmarsall 2 DEC: %s", err.Error())
 		return err
 	}
 	// Process the rumor locally

@@ -58,16 +58,14 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0")
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4))
+
 	defer node0.Stop()
-
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0")
 	defer node1.Stop()
-
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0")
 	defer node2.Stop()
-
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0")
 	defer node3.Stop()
 
 	node0.AddPeer(node1.GetAddr())
@@ -128,7 +126,11 @@ func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	trustedPeers[1] = node1.GetAddr()
 	trustedPeers[2] = node3.GetAddr()
 
-	buf, err := node0.CrowdsDownload(trustedPeers, mh)
+	filename := "testFile.txt"
+	node2.Tag(filename, mh)
+	time.Sleep(time.Second * 2)
+	
+	buf, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
 	require.Equal(t, data, buf)
 

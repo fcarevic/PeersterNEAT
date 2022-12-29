@@ -8,24 +8,6 @@ import (
 	"math/rand"
 )
 
-// Callback function for chat message
-func (n *node) chatMessageCallback(msg types.Message, pkt transport.Packet) error {
-
-	chatMsg, ok := msg.(*types.ChatMessage)
-	if !ok {
-		return xerrors.Errorf("Failed to cast to Chat message got wrong type: %T", msg)
-	}
-
-	// Log received message
-	log.Info().Msgf(
-		"Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
-		pkt.Header.Source,
-		pkt.Header.Destination,
-		pkt.Msg.Type,
-		chatMsg)
-	return nil
-}
-
 // Callback function for Empty message
 func (n *node) emptyMessageCallback(msg types.Message, pkt transport.Packet) error {
 	return nil

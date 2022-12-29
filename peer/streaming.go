@@ -35,4 +35,7 @@ type Streaming interface {
 
 	// ReceiveFFMPG4 receives and decodes video clips
 	ReceiveFFMPG4(streamID string, dir string) error
+
+	// GetAllStreams returns all available streams in the network
+	GetAllStreams() []string
 }

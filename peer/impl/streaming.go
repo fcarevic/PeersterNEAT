@@ -16,8 +16,9 @@ const STREAMSLEEPTIME = time.Millisecond
 
 type StreamInfo struct {
 	// Attributes
-	mapClients   map[string][]string
-	mapListening map[string][]types.StreamMessage
+	mapClients       map[string][]string
+	mapListening     map[string][]types.StreamMessage
+	availableStreams []string
 
 	// Encryption
 	mapKeysListening map[string][]byte
@@ -396,6 +397,26 @@ func (n *node) AnnounceStopStreaming(streamID string) error {
 	return nil
 }
 
+func (s *StreamInfo) registerAvailableStream(streamID string) {
+	s.streamInfoMutex.Lock()
+	defer s.streamInfoMutex.Unlock()
+	s.availableStreams = append(s.availableStreams, streamID)
+}
+
+func (s *StreamInfo) unregisterAvailableStream(streamID string) {
+	s.streamInfoMutex.Lock()
+	defer s.streamInfoMutex.Unlock()
+	s.availableStreams = remove[string](s.availableStreams, streamID)
+}
+
+func (n *node) GetAllStreams() []string {
+	n.streamInfo.streamInfoMutex.Lock()
+	defer n.streamInfo.streamInfoMutex.Unlock()
+	tmp := make([]string, len(n.streamInfo.availableStreams))
+	copy(tmp, n.streamInfo.availableStreams)
+	return tmp
+}
+
 // ///////////////////////// CALLBACKS ////////////////////////////////////
 // /////// CALLBACKS ////////////////////////////////////////
 func (n *node) streamDataMessageCallback(msg types.Message, pkt transport.Packet) error {
@@ -501,9 +522,19 @@ func (n *node) streamStopMessageCallback(msg types.Message, pkt transport.Packet
 	if !ok {
 		return xerrors.Errorf("Failed to cast to StreamStopMessage message got wrong type: %T", msg)
 	}
+	n.streamInfo.unregisterAvailableStream(streamStopMsg.StreamID)
 	err := n.streamInfo.unregisterListening(streamStopMsg.StreamID)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (n *node) streamStartMessageCallback(msg types.Message, pkt transport.Packet) error {
+	streamStartMsg, ok := msg.(*types.StreamStartMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to StreamStopMessage message got wrong type: %T", msg)
+	}
+	n.streamInfo.registerAvailableStream(streamStartMsg.StreamID)
 	return nil
 }

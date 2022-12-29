@@ -17,6 +17,8 @@ type Peer interface {
 
 	// PROJECT NACA
 	Crowds
+	// PROJECT RADE
+	PKI
 }
 
 // Factory is the type of function we are using to create new instances of
@@ -83,7 +85,6 @@ type Configuration struct {
 	// retries to send a prepare when it doesn't get enough promises or accepts.
 	// Default: 5s.
 	PaxosProposerRetry time.Duration
-
 
 	// PROJECT NACA
 	CrowdsProbability float64

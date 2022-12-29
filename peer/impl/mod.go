@@ -78,7 +78,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 
 	// PROJECT Peja
 	if n.conf.AntiEntropyInterval != 0 {
-		publicKey, privateKey, err := pkiInit(&n, n.conf.Socket.GetAddress(), 100)
+		publicKey, privateKey, err := n.PkiInit(n.conf.Socket.GetAddress(), 100)
 		if err != nil {
 			log.Error().Msgf("pkiInit error", err)
 			return nil

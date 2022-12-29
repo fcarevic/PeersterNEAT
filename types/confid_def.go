@@ -1,5 +1,5 @@
 package types
 
 type ConfidentialityMessage struct {
-	CipherMessage string
+	CipherMessage []byte
 }

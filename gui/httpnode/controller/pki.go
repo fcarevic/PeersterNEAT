@@ -9,29 +9,29 @@ import (
 )
 
 // NewCrowds returns a new initialized crowds.
-func NewCrowds(node peer.Peer, log *zerolog.Logger) crowds {
+func NewCrowds2(node peer.Peer, log *zerolog.Logger) crowds {
 	return crowds{
 		node: node,
 		log:  log,
 	}
 }
 
-type crowds struct {
+type crowds2 struct {
 	node peer.Peer
 	log  *zerolog.Logger
 }
 
-type CrowdsSendBody struct {
+type CrowdsSendBody2 struct {
 	to    string
 	body  string
 	peers []string
 }
-type CrowdsDownloadBody struct {
+type CrowdsDownloadBody2 struct {
 	filename string
 	peers    []string
 }
 
-func (c crowds) CrowdsSend() http.HandlerFunc {
+func (c crowds) CrowdsSend2() http.HandlerFunc {
 	// pozvati ficinu fju za registrovanje poruke da andrija ne pamti na frontu - opciono
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -46,8 +46,10 @@ func (c crowds) CrowdsSend() http.HandlerFunc {
 			res := CrowdsSendBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
@@ -59,7 +61,7 @@ func (c crowds) CrowdsSend() http.HandlerFunc {
 	}
 }
 
-func (c crowds) CrowdsDownload() http.HandlerFunc {
+func (c crowds) CrowdsDownload2() http.HandlerFunc {
 	// pozvati ficinu fju za registrovanje poruke da andrija ne pamti na frontu - opciono
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -74,8 +76,10 @@ func (c crowds) CrowdsDownload() http.HandlerFunc {
 			res := CrowdsDownloadBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 

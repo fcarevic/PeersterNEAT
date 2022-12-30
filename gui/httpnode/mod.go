@@ -69,6 +69,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 	datasharingctrl := controller.NewDataSharing(node, &log)
 	blockchain := controller.NewBlockchain(conf, &log)
 	crowds := controller.NewCrowds(node, &log)
+	streaming := controller.NewStreaming(node, &log)
 
 	mux.Handle("/messaging/peers", http.HandlerFunc(messagingctrl.PeerHandler()))
 	mux.Handle("/messaging/routing", http.HandlerFunc(messagingctrl.RoutingHandler()))
@@ -104,9 +105,14 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 		"/video/",
 		http.StripPrefix(
 			"/video/",
-			addHeaders(http.FileServer(http.Dir("/home/andrijajelenkovic/Documents/EPFL/dse/cs438-2022-hw3-student-037/gui/web/assets/hlsVideo"))),
+			addHeaders(http.FileServer(http.Dir(controller.VideoPath))),
 		),
 	)
+
+	mux.HandleFunc("/streaming/watch", http.HandlerFunc(streaming.ReceiveStream()))
+	mux.HandleFunc("/streaming/connect", http.HandlerFunc(streaming.ConnectToStream()))
+	mux.HandleFunc("/streaming/start", http.HandlerFunc(streaming.StartStream()))
+	mux.HandleFunc("/streaming/announce", http.HandlerFunc(streaming.AnnounceStream()))
 
 	mux.HandleFunc(
 		"/", func(w http.ResponseWriter, r *http.Request) {

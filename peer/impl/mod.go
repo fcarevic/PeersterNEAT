@@ -31,10 +31,12 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		rumorInfo: RumorInfo{
 			peerSequences: make(map[string]uint),
 			peerRumors:    make(map[string][]types.Rumor),
-			pktToChannelMap: make(map[string]chan struct {
-				transport.Packet
-				types.AckMessage
-			}),
+			pktToChannelMap: make(
+				map[string]chan struct {
+					transport.Packet
+					types.AckMessage
+				},
+			),
 		},
 		dataSharing: DataSharing{
 			catalog:                    make(peer.Catalog),
@@ -117,6 +119,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
 
+	//TODO:Just for testing, should be deleted
+	n.AddPeer("127.0.0.1:31111")
+	n.AddPeer("127.0.0.1:32222")
 	return &n
 }
 
@@ -334,9 +339,11 @@ func (n *node) Broadcast(msg transport.Message) error {
 	// Create the rumor message
 	err2 := n.sendMessageAsRumor(msg, []string{})
 	if err2 != nil {
-		log.Error().Msgf("[%s]: Broadcast: %s",
+		log.Error().Msgf(
+			"[%s]: Broadcast: %s",
 			n.conf.Socket.GetAddress(),
-			err2.Error())
+			err2.Error(),
+		)
 	}
 
 	// Process the rumor locally
@@ -344,7 +351,8 @@ func (n *node) Broadcast(msg transport.Message) error {
 		n.conf.Socket.GetAddress(),
 		n.conf.Socket.GetAddress(),
 		n.conf.Socket.GetAddress(),
-		0)
+		0,
+	)
 
 	// CAUTION! HERE WE PROCESS MESSAGE FROM FUNCTION ARGUMENT, NOT THE RumorMessage
 	n.activeThreads.Add(1)

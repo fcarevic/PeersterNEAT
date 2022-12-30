@@ -3,6 +3,7 @@ package impl
 import (
 	"bufio"
 	"encoding/hex"
+	"fmt"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
 	"os"
@@ -31,12 +32,16 @@ func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price 
 		log.Error().Msgf("%s", err.Error())
 		return
 	}
+	fmt.Println("asd")
 	log.Error().Msgf("Here")
 	defer file.Close()
 	s := bufio.NewScanner(file)
 	s.Split(bufio.ScanLines)
 
+	lines := 0
 	for s.Scan() {
+		lines++
+		fmt.Println(lines)
 		command := s.Text()
 		encoded := ""
 		if command == "#EXT-X-ENDLIST" {
@@ -68,6 +73,7 @@ func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price 
 			log.Error().Msgf("%s", err.Error())
 		}
 	}
+	fmt.Println("finished")
 }
 
 func (n *node) ReceiveFFMPG4(streamID string, dir string) error {
@@ -91,7 +97,11 @@ func (n *node) ReceiveFFMPG4(streamID string, dir string) error {
 			}
 			errWrite := os.WriteFile(dir+"/"+filename, dataDec, 0666)
 			if errWrite != nil {
-				log.Error().Msgf("Error while writing data to a file %s in recevied FFMPG4 %s", filename, errWrite.Error())
+				log.Error().Msgf(
+					"Error while writing data to a file %s in recevied FFMPG4 %s",
+					filename,
+					errWrite.Error(),
+				)
 				continue
 			}
 			toWrite = command + "\n" + filename + "\n"
@@ -102,14 +112,18 @@ func (n *node) ReceiveFFMPG4(streamID string, dir string) error {
 		// This is metafile
 		f, errOpenMetaFile := os.OpenFile(dir+"/"+streamID+".m3u8", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if errOpenMetaFile != nil {
-			log.Error().Msgf("Error while wiritng data to a file %s in received FFMPG4 %s",
-				command, errOpenMetaFile.Error())
+			log.Error().Msgf(
+				"Error while wiritng data to a file %s in received FFMPG4 %s",
+				command, errOpenMetaFile.Error(),
+			)
 		}
 
 		if _, errCmdWrite := f.WriteString(toWrite); err != nil {
 			if errCmdWrite != nil {
-				log.Error().Msgf("Error while wiritng data to a file %s in received FFMPG4 %s",
-					toWrite, errCmdWrite.Error())
+				log.Error().Msgf(
+					"Error while wiritng data to a file %s in received FFMPG4 %s",
+					toWrite, errCmdWrite.Error(),
+				)
 			}
 		}
 		errClose := f.Close()

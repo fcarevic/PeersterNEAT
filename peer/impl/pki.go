@@ -123,7 +123,8 @@ func (n *node) PutInitialBlockOnChain(publicKey *rsa.PublicKey, address string, 
 		receiverPublicKey: publicKey,
 		receiverAddress:   address,
 		amount:            amount,
-		streamID:          "нема још"}
+		streamID:          "нема још",
+	}
 	mh, err := stringifyChainBlock(block)
 	if err != nil {
 		return err
@@ -205,9 +206,11 @@ func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey)
 	if err != nil {
 		return nil, err
 	}
-	msgToSend := types.ConfidentialityMessage{CipherMessage: []byte(
-		hex.EncodeToString(aesgcm) + peer.MetafileSep +
-			hex.EncodeToString(encKey))}
+	msgToSend := types.ConfidentialityMessage{
+		CipherMessage: []byte(
+			hex.EncodeToString(aesgcm) + peer.MetafileSep +
+				hex.EncodeToString(encKey)),
+	}
 
 	return msgToSend.CipherMessage, n.Broadcast(transport.Message{Type: msgToSend.Name(), Payload: buf})
 }
@@ -243,7 +246,7 @@ func (n *node) ProcessConfidentialityMessage(msg types.Message, pkt transport.Pa
 		log.Error().Msgf("err unmarshall: %s", err.Error())
 		return err
 	}
-	decryptedMsg, err := n.DecryptedMsg(confMsg.CipherMessage, n.privateKey)
+	decryptedMsg, err := n.DecryptedMsg(confMsg.CipherMessage, n.pkiInfo.privateKey)
 	if err != nil {
 		return err
 	}
@@ -258,7 +261,8 @@ func (n *node) ProcessConfidentialityMessage(msg types.Message, pkt transport.Pa
 		n.conf.Socket.GetAddress(),
 		n.conf.Socket.GetAddress(),
 		n.conf.Socket.GetAddress(),
-		0)
+		0,
+	)
 
 	// CAUTION! HERE WE PROCESS MESSAGE FROM FUNCTION ARGUMENT, NOT THE RumorMessage
 	//n.activeThreads.Add(1)
@@ -357,7 +361,8 @@ func (n *node) PaySubscription(senderAddress, receiverAddress, streamID string, 
 		receiverPublicKey: receiverPublicKey,
 		receiverAddress:   receiverAddress,
 		amount:            amount,
-		streamID:          streamID}
+		streamID:          streamID,
+	}
 	mh, err := stringifyChainBlock(block)
 	if err != nil {
 		return err
@@ -365,8 +370,10 @@ func (n *node) PaySubscription(senderAddress, receiverAddress, streamID string, 
 	return n.Tag(xid.New().String(), mh)
 }
 
-func (n *node) PaySubscriptionFull(senderAddress string, senderPublicKey *rsa.PublicKey,
-	receiverAddress string, receiverPublicKey *rsa.PublicKey, streamID string, amount float64) error {
+func (n *node) PaySubscriptionFull(
+	senderAddress string, senderPublicKey *rsa.PublicKey,
+	receiverAddress string, receiverPublicKey *rsa.PublicKey, streamID string, amount float64,
+) error {
 	// check money
 	currentAmount, err := n.GetAmount(senderAddress)
 	if err != nil {
@@ -381,7 +388,8 @@ func (n *node) PaySubscriptionFull(senderAddress string, senderPublicKey *rsa.Pu
 		receiverPublicKey: receiverPublicKey,
 		receiverAddress:   receiverAddress,
 		amount:            amount,
-		streamID:          streamID}
+		streamID:          streamID,
+	}
 	mh, err := stringifyChainBlock(block)
 	if err != nil {
 		return err
@@ -389,8 +397,10 @@ func (n *node) PaySubscriptionFull(senderAddress string, senderPublicKey *rsa.Pu
 	return n.Tag(xid.New().String(), mh)
 }
 
-func doubleCheckPayment(senderAddress, lastBlockHashHex, endBlockHasHex string,
-	BlockchainStore storage.Store) (float64, error) {
+func doubleCheckPayment(
+	senderAddress, lastBlockHashHex, endBlockHasHex string,
+	BlockchainStore storage.Store,
+) (float64, error) {
 	errAmount := -1.0
 	prevAmount := 0.0
 	var block types.BlockchainBlock
@@ -466,7 +476,8 @@ func (n *node) SetInitBlock(publicKey *rsa.PublicKey, address string, amount flo
 		receiverPublicKey: publicKey,
 		receiverAddress:   address,
 		amount:            amount,
-		streamID:          "нема још"}
+		streamID:          "нема још",
+	}
 	mh, err := stringifyChainBlock(chainBlock)
 	if err != nil {
 		return err

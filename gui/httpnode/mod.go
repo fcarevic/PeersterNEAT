@@ -69,6 +69,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 	datasharingctrl := controller.NewDataSharing(node, &log)
 	blockchain := controller.NewBlockchain(conf, &log)
 	crowds := controller.NewCrowds(node, &log)
+	pki := controller.NewPKI(node, &log)
 
 	mux.Handle("/messaging/peers", http.HandlerFunc(messagingctrl.PeerHandler()))
 	mux.Handle("/messaging/routing", http.HandlerFunc(messagingctrl.RoutingHandler()))
@@ -77,6 +78,14 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 
 	mux.Handle("/crowds/send", http.HandlerFunc(crowds.CrowdsSend()))
 	mux.Handle("/crowds/download", http.HandlerFunc(crowds.CrowdsDownload()))
+
+	mux.Handle("/pki/send", http.HandlerFunc(pki.PKISend()))
+	mux.Handle("/pki/decrypt", http.HandlerFunc(pki.PKIDecrypt()))
+	mux.Handle("/pki/publicKey", http.HandlerFunc(pki.PKIPublicKey()))
+	mux.Handle("/pki/paySubscription", http.HandlerFunc(pki.PKIPaySubscription()))
+	mux.Handle("/pki/paySubscriptionFull", http.HandlerFunc(pki.PKIPaySubscriptionFull()))
+	mux.Handle("/pki/checkPaid", http.HandlerFunc(pki.PKICheckPaid()))
+	mux.Handle("/pki/putInitialBlockOnChain", http.HandlerFunc(pki.PKIPutInitialBlockOnChain()))
 
 	mux.Handle("/socket/ins", http.HandlerFunc(socketctrl.InsHandler()))
 	mux.Handle("/socket/outs", http.HandlerFunc(socketctrl.OutsHandler()))

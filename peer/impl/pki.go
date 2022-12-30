@@ -177,14 +177,6 @@ func (n *node) EncryptMsg(msg transport.Message, key *rsa.PublicKey) (*types.Con
 	return &types.ConfidentialityMessage{CipherMessage: cipherMsg}, nil
 }
 
-//func (n *node) EncryptByte(msg []byte, key *rsa.PublicKey) ([]byte, error) {
-//	cipherMsg, err := encryptMsg(msg, key)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return cipherMsg, nil
-//}
-
 func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey) ([]byte, error) {
 	buf, err := json.Marshal(&msg)
 	if err != nil {
@@ -211,6 +203,7 @@ func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey)
 
 	return msgToSend.CipherMessage, n.Broadcast(transport.Message{Type: msgToSend.Name(), Payload: buf})
 }
+
 func (n *node) DecryptedMsg(cipherMsg []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
 	tmps := strings.Split(string(cipherMsg), peer.MetafileSep)
 	aesgcm, err := hex.DecodeString(tmps[0])
@@ -243,7 +236,7 @@ func (n *node) ProcessConfidentialityMessage(msg types.Message, pkt transport.Pa
 		log.Error().Msgf("err unmarshall: %s", err.Error())
 		return err
 	}
-	decryptedMsg, err := n.DecryptedMsg(confMsg.CipherMessage, n.privateKey)
+	decryptedMsg, err := n.DecryptedMsg(confMsg.CipherMessage, n.pkiInfo.privateKey)
 	if err != nil {
 		return err
 	}

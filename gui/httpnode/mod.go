@@ -71,6 +71,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 	crowds := controller.NewCrowds(node, &log)
 	streaming := controller.NewStreaming(node, &log)
 	pki := controller.NewPKI(node, &log)
+	filesharing := controller.NewFileSharing(conf, &log)
 
 	mux.Handle("/messaging/peers", http.HandlerFunc(messagingctrl.PeerHandler()))
 	mux.Handle("/messaging/routing", http.HandlerFunc(messagingctrl.RoutingHandler()))
@@ -111,6 +112,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 	mux.Handle("/blockchain", http.HandlerFunc(blockchain.BlockchainHandler()))
 
 	mux.Handle("/filesharing/blockchain", http.HandlerFunc(blockchain.GetFilesOnBlockchainHandler()))
+	mux.Handle("/filesharing/local", http.HandlerFunc(filesharing.GetLocalFilesHandler()))
 	mux.Handle(
 		"/video/",
 		http.StripPrefix(

@@ -123,7 +123,7 @@ func (d datasharing) uploadPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte(mh))
+	w.Write([]byte("\"" + mh + "\""))
 }
 
 // Get key=key

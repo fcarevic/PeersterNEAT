@@ -26,6 +26,28 @@ type messaging struct {
 	log  *zerolog.Logger
 }
 
+func (m messaging) GetMessages() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			messages := m.node.GetChatMessages()
+			js, err := json.Marshal(messages)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Write(js)
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+			return
+		}
+	}
+}
+
 func (m messaging) PeerHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -108,8 +130,10 @@ func (m messaging) peerPost(w http.ResponseWriter, r *http.Request) {
 	res := types.AddPeerArgument{}
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
-		http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-			http.StatusInternalServerError)
+		http.Error(
+			w, "failed to unmarshal addPeerArgument: "+err.Error(),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -126,8 +150,10 @@ func (m messaging) routingGet(w http.ResponseWriter, r *http.Request) {
 
 	err := r.ParseForm()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed tp parse form: %v", err),
-			http.StatusInternalServerError)
+		http.Error(
+			w, fmt.Sprintf("failed tp parse form: %v", err),
+			http.StatusInternalServerError,
+		)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -168,8 +194,10 @@ func (m messaging) routingPost(w http.ResponseWriter, r *http.Request) {
 	res := types.SetRoutingEntryArgument{}
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
-		http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-			http.StatusInternalServerError)
+		http.Error(
+			w, "failed to unmarshal addPeerArgument: "+err.Error(),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -202,8 +230,10 @@ func (m messaging) unicastPost(w http.ResponseWriter, r *http.Request) {
 	res := types.UnicastArgument{}
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
-		http.Error(w, "failed to unmarshal unicast argument: "+err.Error(),
-			http.StatusInternalServerError)
+		http.Error(
+			w, "failed to unmarshal unicast argument: "+err.Error(),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
@@ -228,8 +258,10 @@ func (m messaging) broadcastPost(w http.ResponseWriter, r *http.Request) {
 	res := transport.Message{}
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
-		http.Error(w, "failed to unmarshal broadcast argument: "+err.Error(),
-			http.StatusInternalServerError)
+		http.Error(
+			w, "failed to unmarshal broadcast argument: "+err.Error(),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 

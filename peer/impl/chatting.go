@@ -10,61 +10,34 @@ import (
 )
 
 type ChatInfo struct {
-	receivedMessages []peer.ChatMessageInfo
-	sentMessages     []peer.ChatMessageInfo
-	chatInfoMutex    sync.Mutex
+	messages      []peer.ChatMessageInfo
+	chatInfoMutex sync.Mutex
 }
 
-func (c *ChatInfo) GetSentChatMessages() []peer.ChatMessageInfo {
+func (c *ChatInfo) GetMessages() []peer.ChatMessageInfo {
 	c.chatInfoMutex.Lock()
 	defer c.chatInfoMutex.Unlock()
-	tmp := make([]peer.ChatMessageInfo, len(c.sentMessages))
-	copy(tmp, c.sentMessages)
+	tmp := make([]peer.ChatMessageInfo, len(c.messages))
+	copy(tmp, c.messages)
 	return tmp
 }
 
-func (c *ChatInfo) GetReceivedChatMessages() []peer.ChatMessageInfo {
-	c.chatInfoMutex.Lock()
-	defer c.chatInfoMutex.Unlock()
-	tmp := make([]peer.ChatMessageInfo, len(c.receivedMessages))
-	copy(tmp, c.sentMessages)
-	return tmp
-}
-
-func (c *ChatInfo) RegisterSentMessage(msg string, to string, from string) {
+func (c *ChatInfo) AddMessage(msg string, to string) {
 	chatMsg := peer.ChatMessageInfo{
 		Message:  msg,
 		Receiver: to,
-		Sender:   from,
 	}
 	c.chatInfoMutex.Lock()
 	defer c.chatInfoMutex.Unlock()
-	c.sentMessages = append(c.sentMessages, chatMsg)
-}
-func (c *ChatInfo) RegisterReceivedMessage(msg string, to string, from string) {
-	chatMsg := peer.ChatMessageInfo{
-		Message:  msg,
-		Receiver: to,
-		Sender:   from,
-	}
-	c.chatInfoMutex.Lock()
-	defer c.chatInfoMutex.Unlock()
-	c.sentMessages = append(c.receivedMessages, chatMsg)
+	c.messages = append(c.messages, chatMsg)
 }
 
-func (n *node) RegisterReceivedMessage(msg string, from string) {
-	n.chatInfo.RegisterReceivedMessage(msg, n.conf.Socket.GetAddress(), from)
+func (n *node) AddChatMessage(msg string, to string) {
+	n.chatInfo.AddMessage(msg, to)
 }
 
-func (n *node) RegisterSentMessage(msg string, to string) {
-	n.chatInfo.RegisterSentMessage(msg, to, n.conf.Socket.GetAddress())
-}
-
-func (n *node) GetReceivedChatMessages() []peer.ChatMessageInfo {
-	return n.chatInfo.GetReceivedChatMessages()
-}
-func (n *node) GetSentChatMessages() []peer.ChatMessageInfo {
-	return n.chatInfo.GetSentChatMessages()
+func (n *node) GetChatMessages() []peer.ChatMessageInfo {
+	return n.chatInfo.GetMessages()
 }
 
 // Callback function for chat message
@@ -75,13 +48,14 @@ func (n *node) chatMessageCallback(msg types.Message, pkt transport.Packet) erro
 		return xerrors.Errorf("Failed to cast to Chat message got wrong type: %T", msg)
 	}
 
-	n.RegisterReceivedMessage(chatMsg.Message, pkt.Header.Source)
+	n.AddChatMessage(chatMsg.Message, pkt.Header.Destination)
 	// Log received message
 	log.Info().Msgf(
 		"Source: %s \t Destination: %s: \t MessageType: %s \t MessageBody: %s",
 		pkt.Header.Source,
 		pkt.Header.Destination,
 		pkt.Msg.Type,
-		chatMsg)
+		chatMsg,
+	)
 	return nil
 }

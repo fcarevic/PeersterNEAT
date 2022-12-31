@@ -66,8 +66,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			mapMulticastClients: make(map[string][]string),
 		},
 		chatInfo: ChatInfo{
-			sentMessages:     make([]peer.ChatMessageInfo, 0),
-			receivedMessages: make([]peer.ChatMessageInfo, 0),
+			messages: make([]peer.ChatMessageInfo, 0),
 		},
 		// PROJECT Naca
 		crowdsInfo: CrowdsInfo{
@@ -251,6 +250,15 @@ func (n *node) Unicast(dest string, msg transport.Message) error {
 	var relay = src
 	var pkt = msgToPacket(src, relay, dest, msg)
 	err := n.sendPkt(pkt, TIMEOUT)
+	if msg.Type == (types.ChatMessage{}).Name() {
+		var chat types.ChatMessage
+		err = n.conf.MessageRegistry.UnmarshalMessage(&msg, &chat)
+		if err != nil {
+			log.Error().Msgf("ERROR: in unicast function: %s", err.Error())
+			return err
+		}
+		n.AddChatMessage(chat.Message, dest)
+	}
 	if err != nil {
 		log.Error().Msgf("ERROR: in unicast function: %s", err.Error())
 		return err

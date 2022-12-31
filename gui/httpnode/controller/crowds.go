@@ -46,13 +46,18 @@ func (c crowds) CrowdsSend() http.HandlerFunc {
 			res := CrowdsSendBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
 			c.node.CrowdsSend(res.peers, res.body, res.to)
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
@@ -74,13 +79,18 @@ func (c crowds) CrowdsDownload() http.HandlerFunc {
 			res := CrowdsDownloadBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
 			c.node.CrowdsDownload(res.peers, res.filename)
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}

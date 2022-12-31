@@ -120,8 +120,12 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
 
 	//TODO:Just for testing, should be deleted
-	n.AddPeer("127.0.0.1:31111")
-	n.AddPeer("127.0.0.1:32222")
+	if n.conf.Socket.GetAddress() != "127.0.0.1:31111" {
+		n.AddPeer("127.0.0.1:31111")
+	}
+	if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
+		n.AddPeer("127.0.0.1:32222")
+	}
 	return &n
 }
 

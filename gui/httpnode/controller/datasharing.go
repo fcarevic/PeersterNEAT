@@ -149,7 +149,7 @@ func (d datasharing) downloadGet(w http.ResponseWriter, r *http.Request) {
 }
 
 // Peer.Tag()
-// JSON: ["name", "metahash"]
+// JSON: ["Name", "metahash"]
 func (d datasharing) namingPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
@@ -162,7 +162,7 @@ func (d datasharing) namingPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	arguments := [2]string{} // [name, metahash]
+	arguments := [2]string{} // [Name, metahash]
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
 		http.Error(
@@ -180,13 +180,13 @@ func (d datasharing) namingPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // Peer.Resolve()
-// Get name=name
+// Get Name=Name
 func (d datasharing) namingGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	name := r.URL.Query().Get("name")
+	name := r.URL.Query().Get("Name")
 	if name == "" {
-		http.Error(w, "'name' argument not found or empty", http.StatusBadRequest)
+		http.Error(w, "'Name' argument not found or empty", http.StatusBadRequest)
 		return
 	}
 

@@ -3,9 +3,11 @@ package controller
 import (
 	"crypto/rsa"
 	"encoding/json"
+	"fmt"
 	"github.com/rs/zerolog"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/transport"
+	"go.dedis.ch/cs438/types"
 	"io"
 	"net/http"
 )
@@ -43,8 +45,10 @@ func (c pki) PKISend() http.HandlerFunc {
 			res := PKISendBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
@@ -56,7 +60,10 @@ func (c pki) PKISend() http.HandlerFunc {
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
@@ -83,8 +90,10 @@ func (c pki) PKIDecrypt() http.HandlerFunc {
 			res := PKIDecryptBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
@@ -96,7 +105,10 @@ func (c pki) PKIDecrypt() http.HandlerFunc {
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
@@ -122,8 +134,10 @@ func (c pki) PKIPublicKey() http.HandlerFunc {
 			res := PKIPublicKeyBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
@@ -139,15 +153,14 @@ func (c pki) PKIPublicKey() http.HandlerFunc {
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
 	}
-}
-
-type PKIAmountBody struct {
-	address string
 }
 
 func (c pki) PKIAmount() http.HandlerFunc {
@@ -155,23 +168,17 @@ func (c pki) PKIAmount() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
-		case http.MethodPost:
-			buf, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
+		case http.MethodGet:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Content-Type", "application/json")
+			address := r.URL.Query().Get("address")
 
-			res := PKIAmountBody{}
-			err = json.Unmarshal(buf, &res)
+			amount, err := c.node.GetAmount(address)
+			fmt.Println(amount)
+			fmt.Println(err)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
-				return
-			}
-
-			amount, err := c.node.GetAmount(res.address)
-			if err != nil {
+				http.Error(w, "error getting amount", http.StatusInternalServerError)
 				return
 			}
 			marshal, err := json.Marshal(amount)
@@ -182,7 +189,10 @@ func (c pki) PKIAmount() http.HandlerFunc {
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
@@ -209,8 +219,10 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 			res := PKIPaySubscriptionBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
@@ -218,7 +230,10 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
@@ -249,17 +264,24 @@ func (c pki) PKIPaySubscriptionFull() http.HandlerFunc {
 			res := PKIPaySubscriptionFullBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
-			err = c.node.PaySubscriptionFull(res.senderAddress, res.senderPublicKey,
-				res.receiverAddress, res.receiverPublicKey, res.streamID, res.amount)
+			err = c.node.PaySubscriptionFull(
+				res.senderAddress, res.senderPublicKey,
+				res.receiverAddress, res.receiverPublicKey, res.streamID, res.amount,
+			)
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
@@ -286,12 +308,19 @@ func (c pki) PKICheckPaid() http.HandlerFunc {
 			res := PKICheckPaidBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
-			subscription, err := c.node.IsPayedSubscription(res.senderAddress, res.receiverAddress, res.streamID, res.amount)
+			subscription, err := c.node.IsPayedSubscription(
+				res.senderAddress,
+				res.receiverAddress,
+				res.streamID,
+				res.amount,
+			)
 			if err != nil {
 				return
 			}
@@ -303,7 +332,10 @@ func (c pki) PKICheckPaid() http.HandlerFunc {
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
@@ -331,8 +363,10 @@ func (c pki) PKIPutInitialBlockOnChain() http.HandlerFunc {
 			res := PKIPutInitialBlockOnChainBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
-				http.Error(w, "failed to unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError)
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
 				return
 			}
 
@@ -340,9 +374,77 @@ func (c pki) PKIPutInitialBlockOnChain() http.HandlerFunc {
 			if err != nil {
 				return
 			}
-
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+type SendPrivateMessageBody struct {
+	to   string
+	body string
+}
+
+func (p pki) SendPrivateMessage() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			buf, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			res := SendPrivateMessageBody{}
+			err = json.Unmarshal(buf, &res)
+			if err != nil {
+				http.Error(
+					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			key, err := p.node.GetPublicKey(res.to)
+			if err != nil {
+				http.Error(
+					w, "failed to get public key: "+err.Error(),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+			msg := types.ChatMessage{Message: res.body}
+			payload, err := json.Marshal(msg)
+			if err != nil {
+				http.Error(
+					w, "failed to marshall message: "+err.Error(),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+			transportMsg := transport.Message{
+				Type:    msg.Name(),
+				Payload: payload,
+			}
+			_, err = p.node.SendEncryptedMsg(transportMsg, key)
+			if err != nil {
+				http.Error(
+					w, "failed to send private message: "+err.Error(),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+			return
 		}
 	}
 }

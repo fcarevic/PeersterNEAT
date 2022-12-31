@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"fmt"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/transport"
@@ -200,8 +201,10 @@ func (n *node) AnnounceStartStreaming(name string, price uint, thumbnail []byte)
 	// 2. Streamer generates symmetric key that will be used for this stream
 	symmetricKey, errKeyGen := generateNewAESKey()
 	if errKeyGen != nil {
-		log.Error().Msgf("[%s] startStreaming: Error while generating the AES key: %s",
-			n.conf.Socket.GetAddress(), errKeyGen.Error())
+		log.Error().Msgf(
+			"[%s] startStreaming: Error while generating the AES key: %s",
+			n.conf.Socket.GetAddress(), errKeyGen.Error(),
+		)
 		return "", errKeyGen
 	}
 
@@ -241,14 +244,16 @@ func (n *node) broadcastStartStreaming(streamInfo types.StreamInfo) error {
 
 	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(streamStartMessage)
 	if errMarshall != nil {
-		log.Error().Msgf("[%s] announceStreaming: Error while marshalling StreamStartMessage: %s",
+		log.Error().Msgf(
+			"[%s] announceStreaming: Error while marshalling StreamStartMessage: %s",
 			n.conf.Socket.GetAddress(), errMarshall.Error(),
 		)
 		return errMarshall
 	}
 	errBroadcast := n.Broadcast(transportMsg)
 	if errBroadcast != nil {
-		log.Error().Msgf("[%s] announceStreaming: Error while Broadcasting: %s",
+		log.Error().Msgf(
+			"[%s] announceStreaming: Error while Broadcasting: %s",
 			n.conf.Socket.GetAddress(), errBroadcast.Error(),
 		)
 		return errBroadcast
@@ -273,9 +278,11 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 		chunk := make([]byte, n.conf.ChunkSize)
 		numBytes, errRead := data.Read(chunk)
 		if errRead != nil && errRead != io.EOF {
-			log.Error().Msgf("[%s]: stream: error while reading the file: %s",
+			log.Error().Msgf(
+				"[%s]: stream: error while reading the file: %s",
 				n.conf.Socket.GetAddress(),
-				errRead.Error())
+				errRead.Error(),
+			)
 			return
 		}
 		if numBytes > 0 {
@@ -302,8 +309,10 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 
 			payload, errConv := convertStreamMsgToPayload(streamMsg, symmetricKey)
 			if errConv != nil {
-				log.Error().Msgf("[%s]: stream: convertStreamMsgToPayload error: %s ",
-					n.conf.Socket.GetAddress(), errConv.Error())
+				log.Error().Msgf(
+					"[%s]: stream: convertStreamMsgToPayload error: %s ",
+					n.conf.Socket.GetAddress(), errConv.Error(),
+				)
 				readBytes = numBytes + readBytes
 				continue
 			}
@@ -315,8 +324,10 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 
 			transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(streamDataMsg)
 			if errCast != nil {
-				log.Error().Msgf("[%s]: stream: Marshalling error: %s ",
-					n.conf.Socket.GetAddress(), errConv.Error())
+				log.Error().Msgf(
+					"[%s]: stream: Marshalling error: %s ",
+					n.conf.Socket.GetAddress(), errConv.Error(),
+				)
 				readBytes = numBytes + readBytes
 				continue
 
@@ -327,9 +338,11 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 			}
 			errMulticast := n.Multicast(multicastMsg)
 			if errMulticast != nil {
-				log.Error().Msgf("[%s]: stream: Multicast for chunk [%d, %d] of stream %s failed: %s",
+				log.Error().Msgf(
+					"[%s]: stream: Multicast for chunk [%d, %d] of stream %s failed: %s",
 					n.conf.Socket.GetAddress(), readBytes,
-					readBytes+numBytes, streamMsg.StreamInfo.StreamID, errMulticast.Error())
+					readBytes+numBytes, streamMsg.StreamInfo.StreamID, errMulticast.Error(),
+				)
 				readBytes = numBytes + readBytes
 				continue
 			}
@@ -360,9 +373,11 @@ func (n *node) ConnectToStream(streamID string, streamerID string) error {
 	// Marshall
 	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(joinMsg)
 	if errMarshall != nil {
-		log.Error().Msgf("[%s] ConnectToStream: error while Marshalling %s",
+		log.Error().Msgf(
+			"[%s] ConnectToStream: error while Marshalling %s",
 			n.conf.Socket.GetAddress(),
-			errMarshall.Error())
+			errMarshall.Error(),
+		)
 	}
 
 	return n.JoinMulticast(streamID, streamerID, &transportMsg)
@@ -400,6 +415,7 @@ func (n *node) AnnounceStopStreaming(streamID string) error {
 }
 
 func (s *StreamInfo) registerAvailableStream(stream types.StreamInfo) {
+	fmt.Println("stream available" + stream.Name)
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
 	s.availableStreams = append(s.availableStreams, stream)
@@ -488,9 +504,11 @@ func (n *node) streamConnectMessageCallback(msg types.Message, pkt transport.Pac
 		Accepted:        true,
 	}
 
-	log.Info().Msgf("[%s] streamConnectMessageCallback: "+
-		"Received stream join request for stream %s from client %s",
-		n.conf.Socket.GetAddress(), streamJoinMsg.StreamID, streamJoinMsg.ClientID)
+	log.Info().Msgf(
+		"[%s] streamConnectMessageCallback: "+
+			"Received stream join request for stream %s from client %s",
+		n.conf.Socket.GetAddress(), streamJoinMsg.StreamID, streamJoinMsg.ClientID,
+	)
 
 	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(streamAcceptMsg)
 	if errMarshall != nil {
@@ -498,9 +516,11 @@ func (n *node) streamConnectMessageCallback(msg types.Message, pkt transport.Pac
 	}
 	errUnicast := n.Unicast(streamJoinMsg.ClientID, transportMsg)
 	if errUnicast != nil {
-		log.Info().Msgf("[%s] streamConnectMessageCallback:"+
-			" Error: failed to send unicast for stream %s to client %s",
-			n.conf.Socket.GetAddress(), streamJoinMsg.StreamID, streamJoinMsg.ClientID)
+		log.Info().Msgf(
+			"[%s] streamConnectMessageCallback:"+
+				" Error: failed to send unicast for stream %s to client %s",
+			n.conf.Socket.GetAddress(), streamJoinMsg.StreamID, streamJoinMsg.ClientID,
+		)
 		return errUnicast
 	}
 	return nil

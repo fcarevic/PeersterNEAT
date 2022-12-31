@@ -87,6 +87,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 	mux.Handle("/pki/paySubscriptionFull", http.HandlerFunc(pki.PKIPaySubscriptionFull()))
 	mux.Handle("/pki/checkPaid", http.HandlerFunc(pki.PKICheckPaid()))
 	mux.Handle("/pki/putInitialBlockOnChain", http.HandlerFunc(pki.PKIPutInitialBlockOnChain()))
+	mux.Handle("/pki/balance", http.HandlerFunc(pki.PKIAmount()))
 
 	mux.Handle("/socket/ins", http.HandlerFunc(socketctrl.InsHandler()))
 	mux.Handle("/socket/outs", http.HandlerFunc(socketctrl.OutsHandler()))
@@ -122,6 +123,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 	mux.HandleFunc("/streaming/connect", http.HandlerFunc(streaming.ConnectToStream()))
 	mux.HandleFunc("/streaming/start", http.HandlerFunc(streaming.StartStream()))
 	mux.HandleFunc("/streaming/announce", http.HandlerFunc(streaming.AnnounceStream()))
+	mux.HandleFunc("/streaming", http.HandlerFunc(streaming.GetStreams()))
 
 	mux.HandleFunc(
 		"/", func(w http.ResponseWriter, r *http.Request) {

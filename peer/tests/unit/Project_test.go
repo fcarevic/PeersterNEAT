@@ -448,12 +448,12 @@ func Test_Project_FFMPG4_Stream(t *testing.T) {
 	// Stream
 	manifestName := "filename.m3u8"
 	dir := "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/video"
-	node1.StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID, []byte{})
-	time.Sleep(3 * time.Second)
+	go node1.StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID, []byte{})
 
-	// Node2 Should received all chunks
 	dir = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/recvvideo"
 	err = node2.ReceiveFFMPG4(streamID, dir)
+	time.Sleep(30 * time.Second)
+	// Node2 Should HAVE received all chunks
 	require.NoError(t, err)
 	log.Info().Msgf("Test Done")
 }

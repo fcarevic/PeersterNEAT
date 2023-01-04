@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
+	"go.dedis.ch/cs438/types"
 	"os"
 	"strings"
 	"time"
@@ -77,59 +78,87 @@ func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price 
 }
 
 func (n *node) ReceiveFFMPG4(streamID string, dir string) error {
-	chunks, err := n.GetNextChunks(streamID, -1)
-	if err != nil {
-		return err
-	}
-	for _, chunk := range chunks {
-		encoded := string(chunk.Data.Chunk)
-		splitted := strings.Split(encoded, peer.MetafileSep)
-		command := splitted[0]
-		toWrite := ""
-		if command == "#EXT-X-ENDLIST" {
-			toWrite = command
-		} else if strings.Contains(command, "EXTINF") {
-			filename := splitted[1]
-			dataDec, errDec := hex.DecodeString(splitted[2])
-			if errDec != nil {
-				log.Error().Msgf("Error while decoding data chunk in recevied FFMPG4 %s", errDec.Error())
-				continue
-			}
-			errWrite := os.WriteFile(dir+"/"+filename, dataDec, 0666)
-			if errWrite != nil {
-				log.Error().Msgf(
-					"Error while writing data to a file %s in recevied FFMPG4 %s",
-					filename,
-					errWrite.Error(),
-				)
-				continue
-			}
-			toWrite = command + "\n" + filename + "\n"
-		} else {
-			toWrite = command + "\n" + splitted[1] + "\n"
+	n.activeThreads.Add(1)
+	go func(streamID string, dir string) {
+		defer n.activeThreads.Done()
+		channel := make(chan types.StreamMessage, 5000)
+		log.Info().Msgf("Starting  FFMPG4 Listener")
+		err := n.streamInfo.registerFFMPG4Channel(streamID, channel)
+		if err != nil {
+			log.Error().Msgf("Error while registering to a stream: %s", n.conf.Socket.GetAddress(), err.Error())
+			return
 		}
 
-		// This is metafile
-		f, errOpenMetaFile := os.OpenFile(dir+"/"+streamID+".m3u8", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if errOpenMetaFile != nil {
+		log.Info().Msgf("Started  FFMPG4 Listener")
+		for {
+			select {
+			case <-n.notifyEnd:
+				return
+			case msg, ok := <-channel:
+				if !ok {
+					return
+				}
+				log.Info().Msgf("Received message")
+				decodeFFMPG4StreamMessage(msg, dir, streamID)
+			}
+			//chunks, err := n.GetNextChunks(streamID, -1)
+			//if err != nil {
+			//	return err
+			//}
+		}
+	}(streamID, dir)
+	return nil
+}
+
+func decodeFFMPG4StreamMessage(chunk types.StreamMessage, dir string, streamID string) {
+	encoded := string(chunk.Data.Chunk)
+	splitted := strings.Split(encoded, peer.MetafileSep)
+	command := splitted[0]
+	toWrite := ""
+	if command == "#EXT-X-ENDLIST" {
+		toWrite = command
+	} else if strings.Contains(command, "EXTINF") {
+		filename := splitted[1]
+		dataDec, errDec := hex.DecodeString(splitted[2])
+		if errDec != nil {
+			log.Error().Msgf("Error while decoding data chunk in recevied FFMPG4 %s", errDec.Error())
+			return
+		}
+		errWrite := os.WriteFile(dir+"/"+filename, dataDec, 0666)
+		if errWrite != nil {
+			log.Error().Msgf(
+				"Error while writing data to a file %s in recevied FFMPG4 %s",
+				filename,
+				errWrite.Error(),
+			)
+			return
+		}
+		toWrite = command + "\n" + filename + "\n"
+		log.Info().Msgf("Received StreamID: %s \t filename: %s:\t", streamID[:4], filename)
+	} else {
+		toWrite = command + "\n" + splitted[1] + "\n"
+	}
+
+	// This is metafile
+	f, errOpenMetaFile := os.OpenFile(dir+"/"+streamID+".m3u8", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if errOpenMetaFile != nil {
+		log.Error().Msgf(
+			"Error while wiritng data to a file %s in received FFMPG4 %s",
+			command, errOpenMetaFile.Error(),
+		)
+	}
+
+	if _, errCmdWrite := f.WriteString(toWrite); errCmdWrite != nil {
+		if errCmdWrite != nil {
 			log.Error().Msgf(
 				"Error while wiritng data to a file %s in received FFMPG4 %s",
-				command, errOpenMetaFile.Error(),
+				toWrite, errCmdWrite.Error(),
 			)
 		}
-
-		if _, errCmdWrite := f.WriteString(toWrite); err != nil {
-			if errCmdWrite != nil {
-				log.Error().Msgf(
-					"Error while wiritng data to a file %s in received FFMPG4 %s",
-					toWrite, errCmdWrite.Error(),
-				)
-			}
-		}
-		errClose := f.Close()
-		if errClose != nil {
-			log.Error().Msgf("Error while writing data to a file %s in received FFMPG4 %s", toWrite, errClose.Error())
-		}
 	}
-	return nil
+
+	errClose := f.Close()
+	if errClose != nil {
+		log.Error().Msgf("Error while writing data to a file %s in received FFMPG4 %s", toWrite, errClose.Error())
+	}
 }

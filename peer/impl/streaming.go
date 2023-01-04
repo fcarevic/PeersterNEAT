@@ -17,9 +17,10 @@ const STREAMSLEEPTIME = time.Millisecond
 
 type StreamInfo struct {
 	// Attributes
-	mapClients       map[string][]string
-	mapListening     map[string][]types.StreamMessage
-	availableStreams []types.StreamInfo
+	mapClients        map[string][]string
+	mapListening      map[string][]types.StreamMessage
+	mapFFMPG4channels map[string]chan types.StreamMessage
+	availableStreams  []types.StreamInfo
 
 	// Encryption
 	mapKeysListening map[string][]byte
@@ -41,6 +42,38 @@ func (s *StreamInfo) registerListening(streamID string, key []byte) error {
 	return nil
 }
 
+func (s *StreamInfo) registerFFMPG4Channel(streamID string, channel chan types.StreamMessage) error {
+	// Acquire lock
+	s.streamInfoMutex.Lock()
+	defer s.streamInfoMutex.Unlock()
+	_, ok := s.mapFFMPG4channels[streamID]
+	if ok {
+		return xerrors.Errorf("Stream already exists")
+	}
+	s.mapFFMPG4channels[streamID] = channel
+	return nil
+}
+
+func (s *StreamInfo) notifyFFMPG4ChannelUnsafe(streamID string) {
+	// Acquire lock
+	channel, ok := s.mapFFMPG4channels[streamID]
+	if ok {
+		for _, msg := range s.mapListening[streamID] {
+			channel <- msg
+		}
+		s.mapListening[streamID] = make([]types.StreamMessage, 0)
+	}
+}
+
+func (s *StreamInfo) closeFFMPG4ChannelUnsafe(streamID string) {
+	// Acquire lock
+	channel, ok := s.mapFFMPG4channels[streamID]
+	if ok {
+		delete(s.mapFFMPG4channels, streamID)
+		close(channel)
+	}
+}
+
 func (s *StreamInfo) addListeningStreamMessageUnsafe(streamID string, msg types.StreamMessage) error {
 	streamMsgs, ok := s.mapListening[streamID]
 	if !ok {
@@ -48,6 +81,7 @@ func (s *StreamInfo) addListeningStreamMessageUnsafe(streamID string, msg types.
 	}
 	streamMsgs = append(streamMsgs, msg)
 	s.mapListening[streamID] = sortStreamMessages(streamMsgs)
+	s.notifyFFMPG4ChannelUnsafe(streamID)
 	return nil
 }
 
@@ -104,6 +138,7 @@ func (s *StreamInfo) unregisterListening(streamID string) error {
 	defer s.streamInfoMutex.Unlock()
 	delete(s.mapListening, streamID)
 	delete(s.mapKeysListening, streamID)
+	s.closeFFMPG4ChannelUnsafe(streamID)
 	return nil
 }
 
@@ -184,6 +219,7 @@ func (n *node) Stream(data io.Reader, name string, price uint, streamID string, 
 	// Craft stream info
 	streamInfo := types.StreamInfo{
 		StreamID:          streamID,
+		StreamerID:        n.conf.Socket.GetAddress(),
 		Name:              name,
 		Grade:             0,
 		Price:             price,

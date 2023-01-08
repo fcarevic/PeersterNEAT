@@ -20,7 +20,7 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 	nodes := make([]z.TestNode, numNodes)
 
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)))
+		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second))
 		defer node.Stop()
 		nodes[i] = node
 	}
@@ -38,6 +38,8 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 		trustedPeers[i] = nodes[i].GetAddr()
 	}
 	finalNode := nodes[numNodes-1]
+
+	time.Sleep(time.Second * 2)
 
 	err := nodes[0].CrowdsSend(trustedPeers, "hey there :)", finalNode.GetAddr())
 	require.NoError(t, err)
@@ -58,10 +60,10 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4))
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(2), z.WithAntiEntropy(time.Second))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(3), z.WithAntiEntropy(time.Second))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(4), z.WithAntiEntropy(time.Second))
 
 	defer node0.Stop()
 	defer node1.Stop()
@@ -95,6 +97,8 @@ func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	// metahash, computed by hand
 	mh := "6a0b1d67884e58786e97bc51544cbba4cc3e1279d8ff46da2fa32bcdb44a053e"
 
+	time.Sleep(time.Second * 2)
+	
 	storage := node1.GetStorage().GetDataBlobStore()
 	storage.Set(c1, chunks[0])
 	storage.Set(mh, []byte(fmt.Sprintf("%s\n%s", c1, c2)))
@@ -129,7 +133,7 @@ func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	filename := "testFile.txt"
 	node2.Tag(filename, mh)
 	time.Sleep(time.Second * 2)
-	
+
 	buf, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
 	require.Equal(t, data, buf)
@@ -150,10 +154,10 @@ func Test_FILES(t *testing.T) {
 
 	chunkSize := uint(8192 * 10) // The metafile can handle just 3 chunks
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4), z.WithPaxosID(1))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4))
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
 	defer node0.Stop()
 	defer node1.Stop()
 	defer node2.Stop()

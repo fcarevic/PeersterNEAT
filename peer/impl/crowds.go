@@ -79,23 +79,50 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		peer = crowdsMsg.Recipients[peerIdx]
 	}
 
-	// TODO: this msg should be embedded in ConfidMessage with publickey of peer!
-	return n.Unicast(peer, crowdsMsgMarshalled)
+	publicKey, err := n.GetPublicKey(peer)
+	if err != nil {
+		return err
+	}
+
+	confidMsg, err := n.CreateConfidentialityMsg(crowdsMsgMarshalled, publicKey)
+
+	if err != nil {
+		return err
+	}
+
+	confidMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(confidMsg)
+	if err != nil {
+		return err
+	}
+
+	return n.Unicast(peer, confidMsgMarshalled)
 }
 
 func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Message, error) {
-	// TODO: this should be ConfidMessage
-	chatMsg := types.ChatMessage{
-		Message: content,
-	}
+	chatMsg := types.ChatMessage{Message: content}
 	chatMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(chatMsg)
+	if err != nil {
+		return transport.Message{}, err
+	}
+
+	publicKey, err := n.GetPublicKey(dst)
+	if err != nil {
+		return transport.Message{}, err
+	}
+
+	confidMsg, err := n.CreateConfidentialityMsg(chatMsgMarshalled, publicKey)
+	if err != nil {
+		return transport.Message{}, err
+	}
+
+	confidMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(confidMsg)
 	if err != nil {
 		return transport.Message{}, err
 	}
 
 	crowdsMessagingReqMsg := types.CrowdsMessagingRequestMessage{
 		FinalDst: dst,
-		Msg:      &chatMsgMarshalled,
+		Msg:      &confidMsgMarshalled,
 	}
 
 	return n.conf.MessageRegistry.MarshalMessage(crowdsMessagingReqMsg)

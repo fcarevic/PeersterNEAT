@@ -178,6 +178,35 @@ func (n *node) EncryptMsg(msg transport.Message, key *rsa.PublicKey) (*types.Con
 	return &types.ConfidentialityMessage{CipherMessage: cipherMsg}, nil
 }
 
+func (n *node) CreateConfidentialityMsg(msg transport.Message, publicKey *rsa.PublicKey) (*types.ConfidentialityMessage, error) {
+	buf, err := json.Marshal(&msg)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := generateNewAESKey()
+	if err != nil {
+		return nil, err
+	}
+
+	aesgcm, err := encryptAESGCM(key, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	encKey, err := encryptMsg(key, publicKey)
+	if err != nil {
+		return nil, err
+	}
+	msgToSend := types.ConfidentialityMessage{
+		CipherMessage: []byte(
+			hex.EncodeToString(aesgcm) + peer.MetafileSep +
+				hex.EncodeToString(encKey)),
+	}
+
+	return &msgToSend, nil
+}
+
 func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey) ([]byte, error) {
 	buf, err := json.Marshal(&msg)
 	if err != nil {

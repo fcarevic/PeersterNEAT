@@ -91,6 +91,9 @@ type StreamInfo struct {
 	// StreamID is the id of the stream
 	StreamID string
 
+	// StreamID is the id of the stream
+	StreamerID string
+
 	// Name is the name of the movie
 	Name string
 

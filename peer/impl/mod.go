@@ -57,10 +57,11 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			},
 		},
 		streamInfo: StreamInfo{
-			mapClients:       make(map[string][]string),
-			mapKeysListening: make(map[string][]byte),
-			mapListening:     make(map[string][]types.StreamMessage),
-			availableStreams: make([]types.StreamInfo, 0),
+			mapClients:        make(map[string][]string),
+			mapKeysListening:  make(map[string][]byte),
+			mapListening:      make(map[string][]types.StreamMessage),
+			availableStreams:  make([]types.StreamInfo, 0),
+			mapFFMPG4channels: make(map[string]chan types.StreamMessage),
 		},
 		multicstInfo: MulticastInfo{
 			mapMulticastClients: make(map[string][]string),

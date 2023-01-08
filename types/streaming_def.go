@@ -112,6 +112,7 @@ type StreamInfo struct {
 
 type StreamData struct {
 	Chunk      []byte
+	SeqNum     uint
 	StartIndex uint
 	EndIndex   uint
 }

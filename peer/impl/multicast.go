@@ -84,8 +84,8 @@ func (n *node) Multicast(msg types.MulticastMessage) error {
 
 	multicastClients, ok := n.multicstInfo.mapMulticastClients[msg.ID]
 	if !ok || len(multicastClients) == 0 {
-		log.Error().Msgf("[%s] Multicast: No clients for stream ID: %s",
-			n.conf.Socket.GetAddress(), msg.ID)
+		//log.Error().Msgf("[%s] Multicast: No clients for stream ID: %s",
+		//	n.conf.Socket.GetAddress(), msg.ID)
 		return xerrors.Errorf("No clients for stream: %s", msg.ID)
 	}
 
@@ -155,11 +155,11 @@ func (n *node) multicastMessageCallback(msg types.Message, pkt transport.Packet)
 		return xerrors.Errorf("Failed to cast to MulticastMessage message got wrong type: %T", msg)
 	}
 
-	err := n.Multicast(*multicastMsg)
-	if err != nil {
-		log.Error().Msgf("[%s] multicastMessageCallback: Error in multicast: %s",
-			n.conf.Socket.GetAddress(), err.Error())
-	}
+	_ = n.Multicast(*multicastMsg)
+	//if err != nil {
+	//	log.Error().Msgf("[%s] multicastMessageCallback: Error in multicast: %s",
+	//		n.conf.Socket.GetAddress(), err.Error())
+	//}
 
 	pkt = pkt.Copy()
 	pkt.Msg = multicastMsg.Message

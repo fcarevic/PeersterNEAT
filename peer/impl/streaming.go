@@ -17,8 +17,12 @@ const STREAMSLEEPTIME = time.Millisecond
 
 type StreamInfo struct {
 	// Attributes
-	mapClients        map[string][]string
-	mapListening      map[string][]types.StreamMessage
+	mapClients   map[string][]string
+	mapListening map[string][]types.StreamMessage
+
+	lastArrivedSeq uint
+	lastArrived    []types.StreamMessage
+
 	mapFFMPG4channels map[string]chan types.StreamMessage
 	availableStreams  []types.StreamInfo
 
@@ -75,12 +79,41 @@ func (s *StreamInfo) closeFFMPG4ChannelUnsafe(streamID string) {
 }
 
 func (s *StreamInfo) addListeningStreamMessageUnsafe(streamID string, msg types.StreamMessage) error {
+
+	//log.Info().Msgf("Adding seq num %d", msg.Data.SeqNum)
+	if uint(s.lastArrivedSeq) == msg.Data.SeqNum {
+		s.lastArrived = append(s.lastArrived, msg)
+
+		return nil
+	}
+
+	log.Info().Msgf("Received seq num %d", s.lastArrivedSeq)
+
+	reconstruct := sortStreamMessages(s.lastArrived)
+	var chunk []byte
+	for _, rm := range reconstruct {
+		chunk = append(chunk, rm.Data.Chunk...)
+	}
+
+	reconstructedMsg := types.StreamMessage{
+		StreamInfo: msg.StreamInfo,
+		Data: types.StreamData{
+			StartIndex: s.lastArrivedSeq,
+			Chunk:      chunk,
+			EndIndex:   s.lastArrivedSeq + 1,
+		},
+	}
+
+	s.lastArrivedSeq = msg.Data.SeqNum
+	s.lastArrived = []types.StreamMessage{msg}
+
 	streamMsgs, ok := s.mapListening[streamID]
 	if !ok {
 		return xerrors.Errorf("Stream does not exist.")
 	}
-	streamMsgs = append(streamMsgs, msg)
+	streamMsgs = append(streamMsgs, reconstructedMsg)
 	s.mapListening[streamID] = sortStreamMessages(streamMsgs)
+	log.Info().Msgf("Notify receiver")
 	s.notifyFFMPG4ChannelUnsafe(streamID)
 	return nil
 }
@@ -208,7 +241,7 @@ func (s *StreamInfo) addStreamingKey(streamID string, key []byte) error {
 }
 
 // Starts streaming of provided file. returns the ID of stream.
-func (n *node) Stream(data io.Reader, name string, price uint, streamID string, thumbnail []byte) (err error) {
+func (n *node) Stream(data io.Reader, name string, price uint, streamID string, thumbnail []byte, sequenceNum uint) (err error) {
 
 	// Get symmetric key
 	symmetricKey, errK := n.streamInfo.getSymmetricKey(streamID)
@@ -226,7 +259,7 @@ func (n *node) Stream(data io.Reader, name string, price uint, streamID string, 
 		CurrentlyWatching: 0,
 		Thumbnail:         thumbnail,
 	}
-	n.stream(data, streamInfo, symmetricKey)
+	n.stream(data, streamInfo, symmetricKey, sequenceNum)
 	return nil
 }
 
@@ -298,7 +331,7 @@ func (n *node) broadcastStartStreaming(streamInfo types.StreamInfo) error {
 	return nil
 }
 
-func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey []byte) {
+func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey []byte, seqNum uint) {
 
 	// TODO : Add end of stream channel and node stopping!
 	// TODO : Add sleep for streaming!
@@ -335,6 +368,7 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 			streamData := types.StreamData{
 				StartIndex: uint(readBytes),
 				EndIndex:   uint(readBytes + numBytes),
+				SeqNum:     seqNum,
 				Chunk:      chunk[:numBytes],
 			}
 

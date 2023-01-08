@@ -13,7 +13,7 @@ type Streaming interface {
 	AnnounceStartStreaming(name string, price uint, thumbnail []byte) (stringID string, err error)
 
 	// StartStreaming starts streaming of provided file, returns the ID of stream.
-	Stream(data io.Reader, name string, price uint, streamID string, thumbnail []byte) (err error)
+	Stream(data io.Reader, name string, price uint, streamID string, thumbnail []byte, seqNum uint) (err error)
 
 	// AnnounceStopStreaming stops the stream, returns and error if the stream does not exist
 	AnnounceStopStreaming(streamID string) error

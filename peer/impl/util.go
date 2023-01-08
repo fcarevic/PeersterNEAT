@@ -188,6 +188,9 @@ func serializeStreamMsg(msg types.StreamMessage) []byte {
 	str = str + peer.MetafileSep
 
 	str = str + strconv.Itoa(int(msg.Data.EndIndex))
+	str = str + peer.MetafileSep
+
+	str = str + strconv.Itoa(int(msg.Data.SeqNum))
 	return []byte(str)
 }
 
@@ -237,10 +240,16 @@ func deserializeStreamMsg(serialized string) (types.StreamMessage, error) {
 		return types.StreamMessage{}, errEI
 	}
 
+	seqNum, errSq := strconv.Atoi(splits[9])
+	if errSq != nil {
+		return types.StreamMessage{}, errSq
+	}
+
 	streamData := types.StreamData{
 		StartIndex: uint(startIndex),
 		EndIndex:   uint(endIndex),
 		Chunk:      chunk,
+		SeqNum:     uint(seqNum),
 	}
 	return types.StreamMessage{
 		StreamInfo: streamInfo,

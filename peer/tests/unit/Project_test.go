@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	z "go.dedis.ch/cs438/internal/testing"
 	"go.dedis.ch/cs438/transport/channel"
+	"go.dedis.ch/cs438/transport/udp"
 	"testing"
 	"time"
 )
@@ -71,7 +72,7 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, clients, 0)
 
-	errStream := node1.Stream(buf, "file1", 10, streamID, []byte{})
+	errStream := node1.Stream(buf, "file1", 10, streamID, []byte{}, 0)
 	require.NoError(t, errStream)
 
 	// Wait for stream to finish
@@ -163,7 +164,7 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	require.Len(t, clients, 1)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{}, 0)
 	require.NoError(t, err)
 
 	// Wait for stream to finish
@@ -308,7 +309,7 @@ func Test_Project_SimpleStream(t *testing.T) {
 	require.Len(t, clients, 1)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{}, 0)
 	require.NoError(t, err)
 
 	// Wait for stream to finish
@@ -414,8 +415,8 @@ func Test_Project_SimpleStream(t *testing.T) {
 }
 
 func Test_Project_FFMPG4_Stream(t *testing.T) {
-	transp := channel.NewTransport()
-	chunkSize := uint(12 * 1024 * 1024) // The metafile can handle just 3 chunks
+	transp := udp.NewUDP()
+	chunkSize := uint(12 * 1024) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
 	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithAutostart(false))
@@ -452,7 +453,7 @@ func Test_Project_FFMPG4_Stream(t *testing.T) {
 
 	dir = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/recvvideo"
 	err = node2.ReceiveFFMPG4(streamID, dir)
-	time.Sleep(30 * time.Second)
+	time.Sleep(120 * time.Second)
 	// Node2 Should HAVE received all chunks
 	require.NoError(t, err)
 	log.Info().Msgf("Test Done")
@@ -535,7 +536,7 @@ func Test_Project_RelayedStream(t *testing.T) {
 	require.Len(t, clients, 1)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{}, 0)
 	require.NoError(t, err)
 
 	// Wait for stream to finish
@@ -716,7 +717,7 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	require.Len(t, clients, 2)
 
 	// Stream
-	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{})
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{}, 0)
 	require.NoError(t, err)
 
 	// Wait for stream to finish

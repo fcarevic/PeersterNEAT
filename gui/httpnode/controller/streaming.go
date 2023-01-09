@@ -3,13 +3,14 @@ package controller
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/rs/zerolog"
 	"go.dedis.ch/cs438/peer"
 	"io"
 	"net/http"
 )
 
-const VideoPath = "/home/andrijajelenkovic/Documents/EPFL/dse/cs438-2022-hw3-student-037/gui/web/assets/hlsVideo"
+const VideoPath = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/recvvideo"
 
 type streaming struct {
 	node peer.Peer
@@ -75,7 +76,9 @@ func (s streaming) AnnounceStream() http.HandlerFunc {
 			streamId, err := s.node.AnnounceStartStreaming(res.Name, res.Price, image)
 			if err != nil {
 				http.Error(w, "error announcing stream", http.StatusInternalServerError)
+				fmt.Print("erro announce: %s", err.Error())
 			}
+			fmt.Print("Ovde")
 			w.Write([]byte("\"" + streamId + "\""))
 		case http.MethodOptions:
 			w.Header().Set("Access-Control-Allow-Origin", "*")

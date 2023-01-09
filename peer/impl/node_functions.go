@@ -38,8 +38,9 @@ func mainLoop(n *node) {
 		// If message is for me, then process it else relay it
 		if pkt.Header.Destination == myAddress {
 
-			n.activeThreads.Add(1)
-			go func() {
+			//n.activeThreads.Add(1)
+			//go
+			func() {
 				err := n.conf.MessageRegistry.ProcessPacket(pkt)
 				if err != nil {
 					log.Error().Msgf("[%s]: mainLoop :Error while processsing a packet: %s:\nError: %s",
@@ -48,7 +49,7 @@ func mainLoop(n *node) {
 						err.Error(),
 					)
 				}
-				n.activeThreads.Done()
+				//n.activeThreads.Done()
 			}()
 		} else {
 			// relay the message

@@ -39,7 +39,7 @@ func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price 
 	s := bufio.NewScanner(file)
 	s.Split(bufio.ScanLines)
 
-	lines := 0
+	lines := -1
 	for s.Scan() {
 		lines++
 		fmt.Println(lines)
@@ -62,7 +62,8 @@ func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price 
 			nextLine := s.Text()
 			encoded = command + peer.MetafileSep + nextLine
 		}
-		err = n.Stream(strings.NewReader(encoded), name, price, streamID, thumbnail)
+		log.Info().Msgf("lines %d", lines)
+		err = n.Stream(strings.NewReader(encoded), name, price, streamID, thumbnail, uint(lines))
 		if err != nil {
 			return
 		}
@@ -133,6 +134,7 @@ func decodeFFMPG4StreamMessage(chunk types.StreamMessage, dir string, streamID s
 			)
 			return
 		}
+
 		toWrite = command + "\n" + filename + "\n"
 		log.Info().Msgf("Received StreamID: %s \t filename: %s:\t", streamID[:4], filename)
 	} else {

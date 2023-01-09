@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"go.dedis.ch/cs438/transport/udp"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -20,7 +21,6 @@ import (
 	"go.dedis.ch/cs438/storage/file"
 	"go.dedis.ch/cs438/storage/inmemory"
 
-	"go.dedis.ch/cs438/transport/udp"
 	"golang.org/x/xerrors"
 )
 
@@ -167,7 +167,6 @@ func start(c *urfave.Context) error {
 	nodeAddr := c.String("nodeaddr")
 
 	trans := udp.NewUDP()
-
 	sock, err := trans.CreateSocket(nodeAddr)
 	if err != nil {
 		return xerrors.Errorf("failed to create socket")

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
 	"io"
 	"net/http"
+	"os"
 )
 
-const VideoPath = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/gui/web/assets/hlsVideo"
+const VideoPath = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/cs438-2022-hw1-student-056/gui/web/assets/hlsVideo"
 
 type streaming struct {
 	node peer.Peer
@@ -165,6 +167,7 @@ func (s streaming) ConnectToStream() http.HandlerFunc {
 				fmt.Printf("%v\n", err.Error())
 				http.Error(w, "error connecting to stream", http.StatusInternalServerError)
 			}
+			//CreateFFMPG4Header(streamId, VideoPath)
 			err = s.node.ReceiveFFMPG4(streamId, VideoPath)
 			if err != nil {
 				fmt.Printf("%v\n", err.Error())
@@ -177,6 +180,19 @@ func (s streaming) ConnectToStream() http.HandlerFunc {
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 		}
+	}
+}
+func CreateFFMPG4Header(streamID string, dir string) {
+	metafileHeader := "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:13\n#EXT-X-MEDIA-SEQUENCE:0\n"
+	errWrite := os.WriteFile(dir+"/"+streamID+".m3u8", []byte(metafileHeader), 0666)
+	fmt.Println("Created metafile: " + dir + "/" + streamID + ".m3u8")
+	if errWrite != nil {
+		log.Error().Msgf(
+			"Error while creating metafile for %s : %s",
+			streamID,
+			errWrite.Error(),
+		)
+		return
 	}
 }
 

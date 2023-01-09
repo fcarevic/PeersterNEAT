@@ -20,8 +20,8 @@ type StreamInfo struct {
 	mapClients   map[string][]string
 	mapListening map[string][]types.StreamMessage
 
-	lastArrivedSeq uint
-	lastArrived    []types.StreamMessage
+	lastArrivedSeq map[string]uint
+	lastArrived    map[string][]types.StreamMessage
 
 	mapFFMPG4channels map[string]chan types.StreamMessage
 	availableStreams  []types.StreamInfo
@@ -83,15 +83,28 @@ func (s *StreamInfo) closeFFMPG4ChannelUnsafe(streamID string) {
 func (s *StreamInfo) addListeningStreamMessageUnsafe(streamID string, msg types.StreamMessage) error {
 
 	//log.Info().Msgf("Adding seq num %d", msg.Data.SeqNum)
-	if uint(s.lastArrivedSeq) == msg.Data.SeqNum {
-		s.lastArrived = append(s.lastArrived, msg)
-
+	lastArrivedSeq, ok := s.lastArrivedSeq[streamID]
+	if !ok {
+		s.lastArrivedSeq[streamID] = 0
+		lastArrivedSeq = 0
+	}
+	arrived, exist := s.lastArrived[streamID]
+	if !exist {
+		arrived = []types.StreamMessage{}
+	}
+	if lastArrivedSeq == msg.Data.SeqNum {
+		s.lastArrived[streamID] = append(arrived, msg)
 		return nil
 	}
+	s.lastArrivedSeq[streamID] = msg.Data.SeqNum
+	s.lastArrived[streamID] = []types.StreamMessage{msg}
 
-	log.Info().Msgf("Received seq num %d", s.lastArrivedSeq)
+	if len(arrived) == 0 {
+		return nil
+	}
+	log.Info().Msgf("Received seq num %d", lastArrivedSeq)
 
-	reconstruct := sortStreamMessages(s.lastArrived)
+	reconstruct := sortStreamMessages(arrived)
 	var chunk []byte
 	for _, rm := range reconstruct {
 		chunk = append(chunk, rm.Data.Chunk...)
@@ -100,14 +113,11 @@ func (s *StreamInfo) addListeningStreamMessageUnsafe(streamID string, msg types.
 	reconstructedMsg := types.StreamMessage{
 		StreamInfo: msg.StreamInfo,
 		Data: types.StreamData{
-			StartIndex: s.lastArrivedSeq,
+			StartIndex: lastArrivedSeq,
 			Chunk:      chunk,
-			EndIndex:   s.lastArrivedSeq + 1,
+			EndIndex:   lastArrivedSeq + 1,
 		},
 	}
-
-	s.lastArrivedSeq = msg.Data.SeqNum
-	s.lastArrived = []types.StreamMessage{msg}
 
 	streamMsgs, ok := s.mapListening[streamID]
 	if !ok {
@@ -655,4 +665,6 @@ func (n *node) StreamingInit() {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamConnectMessage{}, n.streamConnectMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamStartMessage{}, n.streamStartMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamStopMessage{}, n.streamStopMessageCallback)
+	n.streamInfo.lastArrivedSeq = make(map[string]uint)
+	n.streamInfo.lastArrived = make(map[string][]types.StreamMessage)
 }

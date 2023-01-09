@@ -119,7 +119,7 @@ func (d datasharing) uploadPost(w http.ResponseWriter, r *http.Request) {
 
 	mh, err := d.node.Upload(r.Body)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to upload: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("failed To upload: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (d datasharing) downloadGet(w http.ResponseWriter, r *http.Request) {
 	res, err := d.node.Download(key)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to download: %v", err),
+			w, fmt.Sprintf("failed To download: %v", err),
 			http.StatusBadRequest,
 		)
 		return
@@ -156,7 +156,7 @@ func (d datasharing) namingPost(w http.ResponseWriter, r *http.Request) {
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to read body: %v", err),
+			w, fmt.Sprintf("failed To read Body: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -166,7 +166,7 @@ func (d datasharing) namingPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			w, fmt.Sprintf("failed To unmarshal arguments: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -174,7 +174,7 @@ func (d datasharing) namingPost(w http.ResponseWriter, r *http.Request) {
 
 	err = d.node.Tag(arguments[0], arguments[1])
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to tag: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("failed To tag: %v", err), http.StatusBadRequest)
 		return
 	}
 }
@@ -201,7 +201,7 @@ func (d datasharing) catalogPost(w http.ResponseWriter, r *http.Request) {
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to read body: %v", err),
+			w, fmt.Sprintf("failed To read Body: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -211,7 +211,7 @@ func (d datasharing) catalogPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			w, fmt.Sprintf("failed To unmarshal arguments: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -228,7 +228,7 @@ func (d datasharing) catalogGet(w http.ResponseWriter, r *http.Request) {
 	js, err := json.MarshalIndent(&catalog, "", "\t")
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to marshal catalog: %v", err),
+			w, fmt.Sprintf("failed To marshal catalog: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -249,7 +249,7 @@ func (d datasharing) getLocalCatalog(w http.ResponseWriter, r *http.Request) {
 
 	js, err := json.MarshalIndent(&catalog, "", "\t")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to marshal catalog: %v", err),
+		http.Error(w, fmt.Sprintf("failed To marshal catalog: %v", err),
 			http.StatusInternalServerError)
 		return
 	}
@@ -272,7 +272,7 @@ func (d datasharing) indexPost(w http.ResponseWriter, r *http.Request) {
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to read body: %v", err),
+			w, fmt.Sprintf("failed To read Body: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -282,7 +282,7 @@ func (d datasharing) indexPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			w, fmt.Sprintf("failed To unmarshal arguments: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -291,7 +291,7 @@ func (d datasharing) indexPost(w http.ResponseWriter, r *http.Request) {
 	regex, err := regexp.Compile(arguments.Pattern)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to parse regex: %v", err),
+			w, fmt.Sprintf("failed To parse regex: %v", err),
 			http.StatusBadRequest,
 		)
 		return
@@ -300,7 +300,7 @@ func (d datasharing) indexPost(w http.ResponseWriter, r *http.Request) {
 	wait, err := time.ParseDuration(arguments.Timeout)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to parse wait: %v", err),
+			w, fmt.Sprintf("failed To parse wait: %v", err),
 			http.StatusBadRequest,
 		)
 		return
@@ -308,14 +308,14 @@ func (d datasharing) indexPost(w http.ResponseWriter, r *http.Request) {
 
 	names, err := d.node.SearchAll(*regex, arguments.Budget, wait)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to index: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("failed To index: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	js, err := json.Marshal(&names)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to marshal names: %v", err),
+			w, fmt.Sprintf("failed To marshal names: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -339,7 +339,7 @@ func (d datasharing) searchPost(w http.ResponseWriter, r *http.Request) {
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to read body: %v", err),
+			w, fmt.Sprintf("failed To read Body: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -349,7 +349,7 @@ func (d datasharing) searchPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &arguments)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to unmarshal arguments: %v", err),
+			w, fmt.Sprintf("failed To unmarshal arguments: %v", err),
 			http.StatusInternalServerError,
 		)
 		return
@@ -358,7 +358,7 @@ func (d datasharing) searchPost(w http.ResponseWriter, r *http.Request) {
 	regex, err := regexp.Compile(arguments.Pattern)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to parse regex: %v", err),
+			w, fmt.Sprintf("failed To parse regex: %v", err),
 			http.StatusBadRequest,
 		)
 		return
@@ -367,7 +367,7 @@ func (d datasharing) searchPost(w http.ResponseWriter, r *http.Request) {
 	timeout, err := time.ParseDuration(arguments.Timeout)
 	if err != nil {
 		http.Error(
-			w, fmt.Sprintf("failed to parse wait: %v", err),
+			w, fmt.Sprintf("failed To parse wait: %v", err),
 			http.StatusBadRequest,
 		)
 		return
@@ -383,7 +383,7 @@ func (d datasharing) searchPost(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to search: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("failed To search: %v", err), http.StatusBadRequest)
 		return
 	}
 

@@ -45,9 +45,10 @@ func (b blockchain) GetFilesOnBlockchainHandler() http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			store := b.conf.Storage.GetBlockchainStore()
 
-			fileBlocks, err := b.getFileBlocks(store)
+			//TODO: Correct To show only file blocks
+			fileBlocks, err := b.getBlocks(store)
 			if err != nil {
-				http.Error(w, "failed to unmarshal block: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To unmarshal block: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -55,7 +56,7 @@ func (b blockchain) GetFilesOnBlockchainHandler() http.HandlerFunc {
 			js, err := json.MarshalIndent(&fileBlocks, "", "\t")
 			if err != nil {
 				http.Error(
-					w, fmt.Sprintf("failed to marshal catalog: %v", err),
+					w, fmt.Sprintf("failed To marshal catalog: %v", err),
 					http.StatusInternalServerError,
 				)
 				return
@@ -74,7 +75,7 @@ func (b blockchain) blockchainGet(w http.ResponseWriter, r *http.Request) {
 
 	blocks, err := b.getBlocks(store)
 	if err != nil {
-		http.Error(w, "failed to unmarshal block: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To unmarshal block: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	viewData := struct {
@@ -89,7 +90,7 @@ func (b blockchain) blockchainGet(w http.ResponseWriter, r *http.Request) {
 
 	tmpl, err := template.New("html").ParseFiles(("httpnode/controller/blockchain.gohtml"))
 	if err != nil {
-		http.Error(w, "failed to parse template: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To parse template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

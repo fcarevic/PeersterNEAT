@@ -38,7 +38,7 @@ func (c pki) PKISend() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -46,12 +46,12 @@ func (c pki) PKISend() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
 			}
-
+			fmt.Println("asd")
 			msg, err := c.node.SendEncryptedMsg(res.msg, res.publicKey)
 			if err != nil {
 				return
@@ -83,7 +83,7 @@ func (c pki) PKIDecrypt() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -91,7 +91,7 @@ func (c pki) PKIDecrypt() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -127,7 +127,7 @@ func (c pki) PKIPublicKey() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -135,7 +135,7 @@ func (c pki) PKIPublicKey() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -212,7 +212,7 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -220,7 +220,7 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -257,7 +257,7 @@ func (c pki) PKIPaySubscriptionFull() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -265,7 +265,7 @@ func (c pki) PKIPaySubscriptionFull() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -301,7 +301,7 @@ func (c pki) PKICheckPaid() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -309,7 +309,7 @@ func (c pki) PKICheckPaid() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -356,7 +356,7 @@ func (c pki) PKIPutInitialBlockOnChain() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -364,7 +364,7 @@ func (c pki) PKIPutInitialBlockOnChain() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -385,8 +385,8 @@ func (c pki) PKIPutInitialBlockOnChain() http.HandlerFunc {
 }
 
 type SendPrivateMessageBody struct {
-	to   string
-	body string
+	Body string `json:"Body"`
+	To   string `json:"To"`
 }
 
 func (p pki) SendPrivateMessage() http.HandlerFunc {
@@ -395,33 +395,37 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
-
+			fmt.Println(string(buf))
 			res := SendPrivateMessageBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
 			}
 
-			key, err := p.node.GetPublicKey(res.to)
+			fmt.Println("****")
+			fmt.Println(res)
+			fmt.Println(res.To)
+			fmt.Println("***")
+			key, err := p.node.GetPublicKey(res.To)
 			if err != nil {
 				http.Error(
-					w, "failed to get public key: "+err.Error(),
+					w, "failed To get public key: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
 			}
-			msg := types.ChatMessage{Message: res.body}
+			msg := types.ChatMessage{Message: res.Body}
 			payload, err := json.Marshal(msg)
 			if err != nil {
 				http.Error(
-					w, "failed to marshall message: "+err.Error(),
+					w, "failed To marshall message: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -433,7 +437,7 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 			_, err = p.node.SendEncryptedMsg(transportMsg, key)
 			if err != nil {
 				http.Error(
-					w, "failed to send private message: "+err.Error(),
+					w, "failed To send private message: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return

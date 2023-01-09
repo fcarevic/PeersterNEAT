@@ -123,7 +123,7 @@ func (m messaging) BroadcastHandler() http.HandlerFunc {
 func (m messaging) peerPost(w http.ResponseWriter, r *http.Request) {
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -131,13 +131,13 @@ func (m messaging) peerPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
 		http.Error(
-			w, "failed to unmarshal addPeerArgument: "+err.Error(),
+			w, "failed To unmarshal addPeerArgument: "+err.Error(),
 			http.StatusInternalServerError,
 		)
 		return
 	}
 
-	m.log.Info().Msgf("got the following peers: %v", res)
+	m.log.Info().Msgf("got the following Peers: %v", res)
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "*")
@@ -167,7 +167,7 @@ func (m messaging) routingGet(w http.ResponseWriter, r *http.Request) {
 
 		err = enc.Encode(&table)
 		if err != nil {
-			http.Error(w, "failed to marshal routing table", http.StatusInternalServerError)
+			http.Error(w, "failed To marshal routing table", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -182,7 +182,7 @@ func (m messaging) routingGet(w http.ResponseWriter, r *http.Request) {
 func (m messaging) routingPost(w http.ResponseWriter, r *http.Request) {
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -195,7 +195,7 @@ func (m messaging) routingPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
 		http.Error(
-			w, "failed to unmarshal addPeerArgument: "+err.Error(),
+			w, "failed To unmarshal addPeerArgument: "+err.Error(),
 			http.StatusInternalServerError,
 		)
 		return
@@ -221,7 +221,7 @@ func (m messaging) unicastPost(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -231,7 +231,7 @@ func (m messaging) unicastPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
 		http.Error(
-			w, "failed to unmarshal unicast argument: "+err.Error(),
+			w, "failed To unmarshal unicast argument: "+err.Error(),
 			http.StatusInternalServerError,
 		)
 		return
@@ -249,7 +249,7 @@ func (m messaging) broadcastPost(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -259,7 +259,7 @@ func (m messaging) broadcastPost(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
 		http.Error(
-			w, "failed to unmarshal broadcast argument: "+err.Error(),
+			w, "failed To unmarshal broadcast argument: "+err.Error(),
 			http.StatusInternalServerError,
 		)
 		return

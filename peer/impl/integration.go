@@ -9,7 +9,6 @@ import (
 	"go.dedis.ch/cs438/types"
 	"os"
 	"strings"
-	"time"
 )
 
 const ROOTDIR = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/video"
@@ -26,8 +25,10 @@ func (s *StreamInfo) getGrade(streamID string) (float64, error) {
 	return 0, nil
 }
 
-func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string,
-	thumbnail []byte) {
+func (n *node) StreamFFMPG4(
+	manifestName string, dir string, name string, price uint, streamID string,
+	thumbnail []byte,
+) {
 	file, err := os.Open(dir + "/" + manifestName)
 	if err != nil {
 		log.Error().Msgf("%s", err.Error())
@@ -67,7 +68,7 @@ func (n *node) StreamFFMPG4(manifestName string, dir string, name string, price 
 		if err != nil {
 			return
 		}
-		time.Sleep(time.Second)
+		//time.Sleep(time.Second)
 
 		log.Error().Msgf("%d", n)
 
@@ -86,7 +87,8 @@ func (n *node) ReceiveFFMPG4(streamID string, dir string) error {
 		log.Info().Msgf("Starting  FFMPG4 Listener")
 		err := n.streamInfo.registerFFMPG4Channel(streamID, channel)
 		if err != nil {
-			log.Error().Msgf("Error while registering to a stream: %s", n.conf.Socket.GetAddress(), err.Error())
+			log.Error().Msgf("%v\n", err.Error())
+			log.Error().Msgf("Error while registering to a stream: %s", n.conf.Socket.GetAddress())
 			return
 		}
 
@@ -126,6 +128,7 @@ func decodeFFMPG4StreamMessage(chunk types.StreamMessage, dir string, streamID s
 			return
 		}
 		errWrite := os.WriteFile(dir+"/"+filename, dataDec, 0666)
+		fmt.Println(dir + "/" + filename)
 		if errWrite != nil {
 			log.Error().Msgf(
 				"Error while writing data to a file %s in recevied FFMPG4 %s",

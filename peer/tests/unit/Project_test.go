@@ -447,7 +447,7 @@ func Test_Project_FFMPG4_Stream(t *testing.T) {
 	require.Len(t, clients, 1)
 
 	// Stream
-	manifestName := "filename.m3u8"
+	manifestName := "cetvhgn13hoh536ron4g.m3u8"
 	dir := "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/video"
 	go node1.StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID, []byte{})
 
@@ -484,12 +484,18 @@ func Test_Project_RelayedStream(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
-		z.WithContinueMongering(0), z.WithAutostart(false))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
-		z.WithContinueMongering(0), z.WithAutostart(false))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
-		z.WithContinueMongering(0), z.WithAutostart(false))
+	node1 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		z.WithContinueMongering(0), z.WithAutostart(false),
+	)
+	node2 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		z.WithContinueMongering(0), z.WithAutostart(false),
+	)
+	node3 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		z.WithContinueMongering(0), z.WithAutostart(false),
+	)
 	defer node1.Stop()
 	defer node2.Stop()
 	defer node3.Stop()
@@ -652,14 +658,22 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
-		z.WithContinueMongering(1), z.WithAutostart(false))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
-		z.WithContinueMongering(1), z.WithAutostart(false))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
-		z.WithContinueMongering(1), z.WithAutostart(false))
-	node4 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
-		z.WithContinueMongering(1), z.WithAutostart(false))
+	node1 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		z.WithContinueMongering(1), z.WithAutostart(false),
+	)
+	node2 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		z.WithContinueMongering(1), z.WithAutostart(false),
+	)
+	node3 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		z.WithContinueMongering(1), z.WithAutostart(false),
+	)
+	node4 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		z.WithContinueMongering(1), z.WithAutostart(false),
+	)
 	defer node1.Stop()
 	defer node2.Stop()
 	defer node3.Stop()

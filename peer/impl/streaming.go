@@ -51,6 +51,8 @@ func (s *StreamInfo) registerFFMPG4Channel(streamID string, channel chan types.S
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
 	_, ok := s.mapFFMPG4channels[streamID]
+	fmt.Println(streamID)
+	fmt.Println(s.mapFFMPG4channels)
 	if ok {
 		return xerrors.Errorf("Stream already exists")
 	}
@@ -241,7 +243,14 @@ func (s *StreamInfo) addStreamingKey(streamID string, key []byte) error {
 }
 
 // Starts streaming of provided file. returns the ID of stream.
-func (n *node) Stream(data io.Reader, name string, price uint, streamID string, thumbnail []byte, sequenceNum uint) (err error) {
+func (n *node) Stream(
+	data io.Reader,
+	name string,
+	price uint,
+	streamID string,
+	thumbnail []byte,
+	sequenceNum uint,
+) (err error) {
 
 	// Get symmetric key
 	symmetricKey, errK := n.streamInfo.getSymmetricKey(streamID)
@@ -342,7 +351,7 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 	log.Info().Msgf("[%S] STREAM STARTING %s", n.conf.Socket.GetAddress(), streamInfo.StreamID)
 
 	for {
-		time.Sleep(STREAMSLEEPTIME)
+		//time.Sleep(STREAMSLEEPTIME)
 
 		chunk := make([]byte, n.conf.ChunkSize)
 		numBytes, errRead := data.Read(chunk)
@@ -451,6 +460,7 @@ func (n *node) ConnectToStream(streamID string, streamerID string) error {
 	}
 
 	return n.JoinMulticast(streamID, streamerID, &transportMsg)
+	//GENERATE METAFILE
 }
 
 // Returns the number of connected streamers for chosen stream

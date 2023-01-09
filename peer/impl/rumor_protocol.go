@@ -47,7 +47,8 @@ func (rumorInfo *RumorInfo) registerRumorMessageForAck(
 	channel chan struct {
 		transport.Packet
 		types.AckMessage
-	}) {
+	},
+) {
 
 	// Acquire lock
 	rumorInfo.pktToChannelMutex.Lock()
@@ -233,7 +234,8 @@ func (n *node) sendMessageAsRumor(msg transport.Message, excludeNeighbours []str
 	// Register rumor to the map and update sequence number.
 	rumorObject = n.rumorInfo.registerNewRumor(rumorObject, n.conf.Socket.GetAddress())
 	var rumorMessage = types.RumorsMessage{
-		Rumors: []types.Rumor{rumorObject}}
+		Rumors: []types.Rumor{rumorObject},
+	}
 
 	// Get node's address
 	srcAddress := n.conf.Socket.GetAddress()
@@ -268,8 +270,10 @@ func (n *node) sendAckForRumorPacket(pkt transport.Packet, statusMap map[string]
 	// Send packet
 	errSend := n.conf.Socket.Send(receivedFrom, ackPacket, TIMEOUT)
 	if errSend != nil {
-		log.Error().Msgf("[%s]: sendAckForRumorPacket: Sending failed: %s", n.conf.Socket.GetAddress(),
-			errSend.Error())
+		log.Error().Msgf(
+			"[%s]: sendAckForRumorPacket: Sending failed: %s", n.conf.Socket.GetAddress(),
+			errSend.Error(),
+		)
 		return errSend
 	}
 	//log.Info().Msgf("[%s]: sendAckForRumorPacket: Sent ACK to %s", n.conf.Socket.GetAddress(), receivedFrom)
@@ -285,9 +289,11 @@ func (n *node) updateRoutingTableWithRumors(rumors []types.Rumor, relay string) 
 		src := rumor.Origin
 		var nextHop, ok = n.routingTable[src]
 		if !ok {
-			log.Info().Msgf("[%s]dest: %s: next hop: %s",
+			log.Info().Msgf(
+				"[%s]dest: %s: next hop: %s",
 				n.conf.Socket.GetAddress(),
-				src, relay)
+				src, relay,
+			)
 			n.routingTable[src] = relay
 			continue
 		}
@@ -296,9 +302,11 @@ func (n *node) updateRoutingTableWithRumors(rumors []types.Rumor, relay string) 
 			continue
 		}
 		n.routingTable[src] = relay
-		log.Info().Msgf("[%s]dest: %s: next hop: %s",
+		log.Info().Msgf(
+			"[%s]dest: %s: next hop: %s",
 			n.conf.Socket.GetAddress(),
-			src, relay)
+			src, relay,
+		)
 	}
 }
 
@@ -325,8 +333,10 @@ func (n *node) sendCatchUpRumors(rumors []types.Rumor, sendTo string) error {
 	// Send packet. We do not use routing table for catch-up
 	errSend := n.conf.Socket.Send(sendTo, packet, TIMEOUT)
 	if errSend != nil {
-		log.Error().Msgf("[%s]: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
-			errSend.Error())
+		log.Error().Msgf(
+			"[%s]: sendRumors: Sending w/o routing table failed: %s", n.conf.Socket.GetAddress(),
+			errSend.Error(),
+		)
 		return errSend
 	}
 	return nil
@@ -334,7 +344,8 @@ func (n *node) sendCatchUpRumors(rumors []types.Rumor, sendTo string) error {
 
 func (n *node) changePacketHeaderForRumoring(
 	packet transport.Packet,
-	exclNeighbors []string) (transport.Packet, error) {
+	exclNeighbors []string,
+) (transport.Packet, error) {
 	// Change pkt header
 	var newNeighbour, errN = n.getRangomNeighbour(exclNeighbors)
 	if errN != nil {
@@ -385,10 +396,12 @@ func (n *node) startRumoring(
 		return nil
 	}
 	// Init
-	channel := make(chan struct {
-		transport.Packet
-		types.AckMessage
-	})
+	channel := make(
+		chan struct {
+			transport.Packet
+			types.AckMessage
+		},
+	)
 	var timer = time.NewTicker(n.conf.AckTimeout)
 	n.activeThreads.Add(1)
 
@@ -418,7 +431,8 @@ func (n *node) startRumoring(
 					// Extract status msg and process it
 					statusMsg := ackMsg.Status
 					_ = n.processMsgByDummyPkt(
-						statusMsg, arrivedPkt.Header.Source, arrivedPkt.Header.RelayedBy, arrivedPkt.Header.Destination)
+						statusMsg, arrivedPkt.Header.Source, arrivedPkt.Header.RelayedBy, arrivedPkt.Header.Destination,
+					)
 					return
 
 				}
@@ -438,11 +452,13 @@ func (n *node) startRumoring(
 	return nil
 }
 
-func (n *node) sendPktToRandomNeighbour(pkt transport.Packet, excludePeers []string,
+func (n *node) sendPktToRandomNeighbour(
+	pkt transport.Packet, excludePeers []string,
 	needAck bool, channel chan struct {
 		transport.Packet
 		types.AckMessage
-	}) (transport.Packet, error) {
+	},
+) (transport.Packet, error) {
 	// Get random neighbour
 	packet, err := n.changePacketHeaderForRumoring(pkt, excludePeers)
 	if err != nil {
@@ -459,6 +475,7 @@ func (n *node) sendPktToRandomNeighbour(pkt transport.Packet, excludePeers []str
 		if needAck {
 			n.rumorInfo.unregisterRumorMessageForAck(packet)
 		}
+		log.Error().Msgf("%v\n", errSend.Error())
 		log.Error().Msgf("[%s]: sendToRandomNeighbour: Sending message failed", n.conf.Socket.GetAddress())
 		return packet, errSend
 	}

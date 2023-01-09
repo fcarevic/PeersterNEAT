@@ -104,6 +104,7 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 	// Send packet
 	_, err = s.udpConnection.WriteToUDP(bytes, udpDestAddr)
 	if err != nil {
+		log.Error().Msgf("%v\n", err)
 		return err
 	}
 

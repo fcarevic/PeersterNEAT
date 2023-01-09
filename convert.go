@@ -25,7 +25,7 @@ func main() {
 		"0",
 		"-f",
 		"hls",
-		"./video/filename.m3u8",
+		"./video/cetvhgn13hoh536ron4g.m3u8",
 	).Run()
 
 	log.Println(err.Error())

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"text/template"
 
 	"github.com/rs/zerolog"
@@ -44,14 +45,14 @@ func (b blockchain) GetFilesOnBlockchainHandler() http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			store := b.conf.Storage.GetBlockchainStore()
 
-			blocks, err := b.getBlocks(store)
+			fileBlocks, err := b.getFileBlocks(store)
 			if err != nil {
 				http.Error(w, "failed to unmarshal block: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
 
-			js, err := json.MarshalIndent(&blocks, "", "\t")
+			js, err := json.MarshalIndent(&fileBlocks, "", "\t")
 			if err != nil {
 				http.Error(
 					w, fmt.Sprintf("failed to marshal catalog: %v", err),
@@ -130,6 +131,23 @@ func (b blockchain) getBlocks(store storage.Store) ([]viewBlock, error) {
 	}
 
 	return blocks, nil
+}
+
+func (b blockchain) getFileBlocks(store storage.Store) ([]viewBlock, error) {
+	blocks, err := b.getBlocks(store)
+	if err != nil {
+		return nil, err
+	}
+
+	fileBlocks := make([]viewBlock, 0)
+	for _, block := range blocks {
+		if !strings.Contains(block.Metahash, "BEGIN PUBLIC KEY") {
+			fmt.Println(block.Metahash)
+			fileBlocks = append(fileBlocks, block)
+		}
+	}
+
+	return fileBlocks, nil
 }
 
 type viewBlock struct {

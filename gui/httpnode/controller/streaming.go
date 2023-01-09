@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-const VideoPath = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/recvvideo"
+const VideoPath = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/gui/web/assets/hlsVideo"
 
 type streaming struct {
 	node peer.Peer
@@ -68,15 +68,20 @@ func (s streaming) AnnounceStream() http.HandlerFunc {
 				return
 			}
 
-			image, err := base64.StdEncoding.DecodeString(res.Image)
-			if err != nil {
-				http.Error(w, "error decoding Image", http.StatusInternalServerError)
+			var image []byte
+			if res.Image != "" {
+				image, err = base64.StdEncoding.DecodeString(res.Image)
+				if err != nil {
+					http.Error(w, "error decoding Image", http.StatusInternalServerError)
+				}
 			}
 
 			streamId, err := s.node.AnnounceStartStreaming(res.Name, res.Price, image)
 			if err != nil {
 				http.Error(w, "error announcing stream", http.StatusInternalServerError)
 				fmt.Print("erro announce: %s", err.Error())
+			} else {
+				fmt.Println("announced streaming")
 			}
 			fmt.Print("Ovde")
 			w.Write([]byte("\"" + streamId + "\""))
@@ -110,12 +115,35 @@ func (s streaming) StartStream() http.HandlerFunc {
 				return
 			}
 
-			image, err := base64.StdEncoding.DecodeString(res.Image)
-			if err != nil {
-				http.Error(w, "error decoding Image", http.StatusInternalServerError)
+			var image []byte
+			if res.Image != "" {
+				image, err = base64.StdEncoding.DecodeString(res.Image)
+				if err != nil {
+					http.Error(w, "error decoding Image", http.StatusInternalServerError)
+				}
 			}
 
-			s.node.StreamFFMPG4(res.ManifestName, res.Dir, res.Name, res.Price, res.StreamId, image)
+			go s.node.StreamFFMPG4(res.ManifestName, res.Dir, res.Name, res.Price, res.StreamId, image)
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+func (s streaming) StopStream() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			streamId := r.URL.Query().Get("streamId")
+			err := s.node.AnnounceStopStreaming(streamId)
+			if err != nil {
+				fmt.Println(err.Error())
+				http.Error(w, "error stopping stream", http.StatusInternalServerError)
+			}
 		case http.MethodOptions:
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Headers", "*")
@@ -130,9 +158,18 @@ func (s streaming) ConnectToStream() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			streamId := r.URL.Query().Get("StreamId")
+			streamId := r.URL.Query().Get("streamId")
 			streamerId := r.URL.Query().Get("streamerId")
-			s.node.ConnectToStream(streamId, streamerId)
+			err := s.node.ConnectToStream(streamId, streamerId)
+			if err != nil {
+				fmt.Printf("%v\n", err.Error())
+				http.Error(w, "error connecting to stream", http.StatusInternalServerError)
+			}
+			err = s.node.ReceiveFFMPG4(streamId, VideoPath)
+			if err != nil {
+				fmt.Printf("%v\n", err.Error())
+				http.Error(w, "error listening to stream", http.StatusInternalServerError)
+			}
 		case http.MethodOptions:
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Headers", "*")

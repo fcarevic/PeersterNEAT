@@ -42,7 +42,7 @@ func (s servicectrl) stopPost(w http.ResponseWriter, r *http.Request) {
 
 	err := s.peer.Stop()
 	if err != nil {
-		http.Error(w, "failed to stop: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "failed To stop: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 }

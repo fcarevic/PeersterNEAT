@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-const VideoPath = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/cs438-2022-hw1-student-056/gui/web/assets/hlsVideo"
+const VideoPath = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/gui/web/assets/hlsVideo"
 
 type streaming struct {
 	node peer.Peer
@@ -56,7 +56,7 @@ func (s streaming) AnnounceStream() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -64,7 +64,7 @@ func (s streaming) AnnounceStream() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal announceStream: "+err.Error(),
+					w, "failed To unmarshal announceStream: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -103,7 +103,7 @@ func (s streaming) StartStream() http.HandlerFunc {
 		case http.MethodPost:
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "failed to read body: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -111,7 +111,7 @@ func (s streaming) StartStream() http.HandlerFunc {
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
 				http.Error(
-					w, "failed to unmarshal addPeerArgument: "+err.Error(),
+					w, "failed To unmarshal addPeerArgument: "+err.Error(),
 					http.StatusInternalServerError,
 				)
 				return
@@ -165,13 +165,13 @@ func (s streaming) ConnectToStream() http.HandlerFunc {
 			err := s.node.ConnectToStream(streamId, streamerId)
 			if err != nil {
 				fmt.Printf("%v\n", err.Error())
-				http.Error(w, "error connecting to stream", http.StatusInternalServerError)
+				http.Error(w, "error connecting To stream", http.StatusInternalServerError)
 			}
-			//CreateFFMPG4Header(streamId, VideoPath)
+			CreateFFMPG4Header(streamId, VideoPath)
 			err = s.node.ReceiveFFMPG4(streamId, VideoPath)
 			if err != nil {
 				fmt.Printf("%v\n", err.Error())
-				http.Error(w, "error listening to stream", http.StatusInternalServerError)
+				http.Error(w, "error listening To stream", http.StatusInternalServerError)
 			}
 		case http.MethodOptions:
 			w.Header().Set("Access-Control-Allow-Origin", "*")

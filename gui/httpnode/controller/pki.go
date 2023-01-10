@@ -398,7 +398,7 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
-			fmt.Println(string(buf))
+
 			res := SendPrivateMessageBody{}
 			err = json.Unmarshal(buf, &res)
 			if err != nil {
@@ -409,10 +409,6 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 				return
 			}
 
-			fmt.Println("****")
-			fmt.Println(res)
-			fmt.Println(res.To)
-			fmt.Println("***")
 			key, err := p.node.GetPublicKey(res.To)
 			if err != nil {
 				http.Error(
@@ -434,6 +430,7 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 				Type:    msg.Name(),
 				Payload: payload,
 			}
+
 			_, err = p.node.SendEncryptedMsg(transportMsg, key)
 			if err != nil {
 				http.Error(

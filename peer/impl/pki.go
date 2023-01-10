@@ -235,8 +235,12 @@ func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey)
 			hex.EncodeToString(aesgcm) + peer.MetafileSep +
 				hex.EncodeToString(encKey)),
 	}
-	fmt.Println("****SENDING CONFIDENTIALITY MESSAGE****")
-	return msgToSend.CipherMessage, n.Broadcast(transport.Message{Type: msgToSend.Name(), Payload: buf})
+
+	transportMsg, err := n.conf.MessageRegistry.MarshalMessage(msgToSend)
+	if err != nil {
+		return nil, err
+	}
+	return msgToSend.CipherMessage, n.Broadcast(transportMsg)
 }
 
 func (n *node) DecryptedMsg(cipherMsg []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
@@ -265,16 +269,16 @@ func (n *node) DecryptedMsg(cipherMsg []byte, privateKey *rsa.PrivateKey) ([]byt
 }
 
 func (n *node) ProcessConfidentialityMessage(msg types.Message, pkt transport.Packet) error {
-	fmt.Println("****RECEIVING CONFIDENTIALITY MESSAGE****")
-	fmt.Println(msg.Name())
 	var confMsg types.ConfidentialityMessage
 	err := json.Unmarshal(pkt.Msg.Payload, &confMsg)
 	if err != nil {
 		log.Error().Msgf("err unmarshall: %s", err.Error())
 		return err
 	}
+
 	decryptedMsg, err := n.DecryptedMsg(confMsg.CipherMessage, n.pkiInfo.privateKey)
 	if err != nil {
+		fmt.Println(err.Error())
 		return err
 	}
 	var transportMsg transport.Message
@@ -291,8 +295,6 @@ func (n *node) ProcessConfidentialityMessage(msg types.Message, pkt transport.Pa
 		0,
 	)
 
-	fmt.Println(transportMsg)
-	fmt.Println("*****")
 	// CAUTION! HERE WE PROCESS MESSAGE FROM FUNCTION ARGUMENT, NOT THE RumorMessage
 	//n.activeThreads.Add(1)
 	func() {

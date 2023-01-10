@@ -59,7 +59,7 @@ func (reg registryctrl) messagesGet(w http.ResponseWriter, r *http.Request) {
 	for i, msg := range messages {
 		transpMsg, err := reg.registry.MarshalMessage(msg)
 		if err != nil {
-			http.Error(w, "failed to marshal msg: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed To marshal msg: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -68,7 +68,7 @@ func (reg registryctrl) messagesGet(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := json.Marshal(&transpMsgs)
 	if err != nil {
-		http.Error(w, "failed to marshal messages: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To marshal messages: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -87,17 +87,19 @@ func (reg registryctrl) pktNotifyGet(w http.ResponseWriter, r *http.Request) {
 
 	pkts := make(chan transport.Packet, 100)
 
-	reg.registry.RegisterNotify(func(msg types.Message, p transport.Packet) error {
-		pkts <- p
-		return nil
-	})
+	reg.registry.RegisterNotify(
+		func(msg types.Message, p transport.Packet) error {
+			pkts <- p
+			return nil
+		},
+	)
 
 	for {
 		select {
 		case pkt := <-pkts:
 			buf, err := json.Marshal(&pkt)
 			if err != nil {
-				http.Error(w, "failed to marshal pkt: "+err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed To marshal pkt: "+err.Error(), http.StatusInternalServerError)
 			}
 
 			fmt.Fprintf(w, "data: %s\n\n", buf)

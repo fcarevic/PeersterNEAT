@@ -59,7 +59,7 @@ func (s socketctrl) insGet(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := json.Marshal(&ins)
 	if err != nil {
-		http.Error(w, "failed to marshal ins: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To marshal ins: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (s socketctrl) outsGet(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := json.Marshal(&outs)
 	if err != nil {
-		http.Error(w, "failed to marshal outs: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed To marshal outs: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

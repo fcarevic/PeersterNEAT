@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-const MULTICASTCHUNKSIZE = 1024 * 1024 * 12
-const STREAMSLEEPTIME = time.Millisecond
+//const MULTICASTCHUNKSIZE = 1024 * 1024 * 12
+//const STREAMSLEEPTIME = time.Millisecond
 
 type StreamInfo struct {
 	// Attributes
@@ -23,14 +23,52 @@ type StreamInfo struct {
 	lastArrivedSeq map[string]uint
 	lastArrived    map[string][]types.StreamMessage
 
+	// Rating
+	rateMap map[string][]types.StreamRatingMessage
+
 	mapFFMPG4channels map[string]chan types.StreamMessage
-	availableStreams  []types.StreamInfo
+	availableStreams  map[string]types.StreamInfo
 
 	// Encryption
 	mapKeysListening map[string][]byte
 
 	// Semaphores
 	streamInfoMutex sync.Mutex
+}
+
+func (s *StreamInfo) processReaction(reactMsg types.StreamRatingMessage) {
+	// Acquire lock
+	s.streamInfoMutex.Lock()
+	defer s.streamInfoMutex.Unlock()
+	reactions, ok := s.rateMap[reactMsg.StreamID]
+	if !ok {
+		reactions = []types.StreamRatingMessage{}
+	}
+	reactions = append(reactions, reactMsg)
+	s.rateMap[reactMsg.StreamID] = reactions
+}
+
+func (s *StreamInfo) getGradeForStream(streamID string) float64 {
+	// Acquire lock
+	s.streamInfoMutex.Lock()
+	defer s.streamInfoMutex.Unlock()
+	reactions, ok := s.rateMap[streamID]
+	if !ok {
+		return 0.0
+	}
+	sum := 0.0
+	for _, reaction := range reactions {
+		sum = sum + reaction.Grade
+	}
+	grade := sum / float64(len(reactions))
+
+	// Update grade in list of all streams
+	streamInfo, ok := s.availableStreams[streamID]
+	if !ok {
+		return 0.0
+	}
+	streamInfo.Grade = grade
+	return grade
 }
 
 func (s *StreamInfo) registerListening(streamID string, key []byte) error {
@@ -161,15 +199,20 @@ func (s *StreamInfo) getNextChunks(streamID string, numberOfChunks int) ([]types
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
 	streamMsgs, ok := s.mapListening[streamID]
-	if !ok {
+	lastArrivedstreamMsgs, exist := s.lastArrived[streamID]
+	streamMsgs = append(streamMsgs, lastArrivedstreamMsgs...)
+
+	if !ok && !exist {
 		return []types.StreamMessage{}, xerrors.Errorf("Stream does not exist.")
 	}
 	if numberOfChunks == -1 {
 		s.mapListening[streamID] = []types.StreamMessage{}
+		s.lastArrived[streamID] = []types.StreamMessage{}
 		return streamMsgs, nil
 	}
 	retVal := streamMsgs[:numberOfChunks]
 	s.mapListening[streamID] = streamMsgs[numberOfChunks:]
+	s.lastArrived[streamID] = []types.StreamMessage{}
 	return retVal, nil
 }
 
@@ -221,6 +264,13 @@ func (s *StreamInfo) addStreamClient(streamID string, clientID string) error {
 	}
 	clients = append(clients, clientID)
 	s.mapClients[streamID] = clients
+
+	// Update list of all available streams
+	streamInfo, ok := s.availableStreams[streamID]
+	if !ok {
+		return nil
+	}
+	streamInfo.CurrentlyWatching = uint(len(clients))
 	return nil
 }
 
@@ -351,10 +401,6 @@ func (n *node) broadcastStartStreaming(streamInfo types.StreamInfo) error {
 }
 
 func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey []byte, seqNum uint) {
-
-	// TODO : Add end of stream channel and node stopping!
-	// TODO : Add sleep for streaming!
-
 	// Read chunk by chunk
 	var readBytes int
 
@@ -380,7 +426,9 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 				return
 			}
 			streamInfo.CurrentlyWatching = uint(len(clients))
-			streamInfo.Grade, err = n.streamInfo.getGrade(streamInfo.StreamID)
+			streamInfo.Grade = n.streamInfo.getGradeForStream(streamInfo.StreamID)
+
+			log.Info().Msgf("GRADE: %ls", streamInfo.Grade)
 			if err != nil {
 				return
 			}
@@ -450,7 +498,42 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 
 }
 
+func (n *node) getStreamInfo(streamID string) (types.StreamInfo, error) {
+	n.streamInfo.streamInfoMutex.Lock()
+	defer n.streamInfo.streamInfoMutex.Unlock()
+	streamInfo, ok := n.streamInfo.availableStreams[streamID]
+	if !ok {
+		return types.StreamInfo{}, xerrors.Errorf("Stream %s does not exist", streamID)
+	}
+	return streamInfo, nil
+}
 func (n *node) ConnectToStream(streamID string, streamerID string) error {
+
+	// Check if node has enough money
+	streamInfo, errS := n.getStreamInfo(streamID)
+	if errS != nil {
+		log.Error().Msgf("[%s]ConnectToStream: error:%s", n.conf.Socket.GetAddress(), errS.Error())
+		return errS
+	}
+	amount, errAmount := n.GetAmount(n.conf.Socket.GetAddress())
+	if errAmount != nil {
+		log.Error().Msgf("[%s]ConnectToStream: getAmountError:%s", n.conf.Socket.GetAddress(), errAmount.Error())
+		return errAmount
+	}
+
+	if amount < float64(streamInfo.Price) {
+		return xerrors.Errorf("Not enough money!")
+	}
+
+	errPaySubscription := n.PaySubscription(n.conf.Socket.GetAddress(), streamerID, streamID, float64(streamInfo.Price))
+	if errPaySubscription != nil {
+		log.Error().Msgf("[%s]ConnectToStream: PaySubscriptionError:%s",
+			n.conf.Socket.GetAddress(), errPaySubscription.Error())
+		return errPaySubscription
+	}
+
+	// Wait for the payment to be processed
+	time.Sleep(500 * time.Millisecond)
 
 	// Craft stream join msg
 	joinMsg := types.StreamConnectMessage{
@@ -470,7 +553,6 @@ func (n *node) ConnectToStream(streamID string, streamerID string) error {
 	}
 
 	return n.JoinMulticast(streamID, streamerID, &transportMsg)
-	//GENERATE METAFILE
 }
 
 // Returns the number of connected streamers for chosen stream
@@ -505,30 +587,67 @@ func (n *node) AnnounceStopStreaming(streamID string) error {
 }
 
 func (s *StreamInfo) registerAvailableStream(stream types.StreamInfo) {
-	fmt.Println("stream available" + stream.Name)
+	fmt.Println("stream available " + stream.Name)
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
-	s.availableStreams = append(s.availableStreams, stream)
+	s.availableStreams[stream.StreamID] = stream
+}
+
+func (s *StreamInfo) updateAvailableStreamUnsafe(stream types.StreamInfo) {
+	streamInfo, ok := s.availableStreams[stream.StreamID]
+	if ok {
+		// preserve the pic
+		stream.Thumbnail = streamInfo.Thumbnail
+	}
+	s.availableStreams[stream.StreamID] = stream
+
 }
 
 func (s *StreamInfo) unregisterAvailableStream(streamID string) {
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
-	tmp := make([]types.StreamInfo, 0)
-	for _, inf := range s.availableStreams {
-		if inf.StreamID == streamID {
-			continue
-		}
-		tmp = append(tmp, inf)
+	delete(s.availableStreams, streamID)
+}
+
+func (n *node) ReactToStream(streamID string, streamerID string, grade float64) error {
+
+	// Check if I am listening to a stream
+	_, err := n.streamInfo.getSymmetricKey(streamID)
+	if err != nil {
+		log.Error().Msgf("[%s] React to stream error: %s", n.conf.Socket.GetAddress(), err.Error())
+		return err
 	}
-	s.availableStreams = tmp
+
+	reactMsg := types.StreamRatingMessage{
+		StreamID:   streamID,
+		StreamerID: streamerID,
+		Grade:      grade,
+	}
+
+	// Marshall msg
+	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(reactMsg)
+	if errMarshall != nil {
+		log.Error().Msgf("[%s]:ReactToStream: Error marshalling: %s",
+			n.conf.Socket.GetAddress(), errMarshall.Error())
+		return errMarshall
+	}
+
+	errUnicast := n.Unicast(streamerID, transportMsg)
+	if errUnicast != nil {
+		log.Error().Msgf("[%s]:ReactToStream: Error unicast: %s",
+			n.conf.Socket.GetAddress(), errUnicast.Error())
+		return errUnicast
+	}
+	return nil
 }
 
 func (n *node) GetAllStreams() []types.StreamInfo {
 	n.streamInfo.streamInfoMutex.Lock()
 	defer n.streamInfo.streamInfoMutex.Unlock()
 	tmp := make([]types.StreamInfo, len(n.streamInfo.availableStreams))
-	copy(tmp, n.streamInfo.availableStreams)
+	for _, val := range n.streamInfo.availableStreams {
+		tmp = append(tmp, val)
+	}
 	return tmp
 }
 
@@ -558,6 +677,7 @@ func (n *node) handleStreamDataMsg(message types.StreamDataMessage) error {
 		return err
 	}
 
+	n.streamInfo.updateAvailableStreamUnsafe(streamMessage.StreamInfo)
 	errStr := n.streamInfo.addListeningStreamMessageUnsafe(streamMessage.StreamInfo.StreamID, streamMessage)
 	if errStr != nil {
 		return errStr
@@ -571,6 +691,23 @@ func (n *node) streamConnectMessageCallback(msg types.Message, pkt transport.Pac
 		return xerrors.Errorf("Failed to cast to StreamJoinMessage message got wrong type: %T", msg)
 	}
 
+	// Check if client has pay
+	streamInfo, errInfo := n.getStreamInfo(streamJoinMsg.StreamID)
+	if errInfo != nil {
+		return errInfo
+	}
+	isPayed, errPayed := n.IsPayedSubscription(streamJoinMsg.ClientID, streamJoinMsg.StreamerID,
+		streamJoinMsg.StreamID, float64(streamInfo.Price))
+	if errPayed != nil {
+		return errPayed
+	}
+
+	if !isPayed {
+		log.Info().Msgf("[%s] Not payed subscription: Client: %s, Streamer: %s, Stream %s",
+			n.conf.Socket.GetAddress(), streamJoinMsg.ClientID, streamJoinMsg.StreamerID, streamJoinMsg.StreamID)
+		return nil
+	}
+
 	key, err := n.streamInfo.getSymmetricKey(streamJoinMsg.StreamID)
 	if err != nil {
 		return err
@@ -581,7 +718,7 @@ func (n *node) streamConnectMessageCallback(msg types.Message, pkt transport.Pac
 		return errAdd
 	}
 
-	encKey, errEnc := encryptSymmetricKey(key, streamJoinMsg.ClientID)
+	encKey, errEnc := n.encryptSymmetricKey(key, streamJoinMsg.ClientID)
 	if errEnc != nil {
 		return errEnc
 	}
@@ -625,7 +762,7 @@ func (n *node) streamAcceptMessageCallback(msg types.Message, pkt transport.Pack
 	if streamAcceptMsg.Accepted == false {
 		return nil
 	}
-	key, errDecr := decryptSymmetricKey(streamAcceptMsg.EncSymmetricKey, streamAcceptMsg.ClientID)
+	key, errDecr := n.decryptSymmetricKey(streamAcceptMsg.EncSymmetricKey, streamAcceptMsg.ClientID)
 	if errDecr != nil {
 		return errDecr
 	}
@@ -652,9 +789,18 @@ func (n *node) streamStopMessageCallback(msg types.Message, pkt transport.Packet
 func (n *node) streamStartMessageCallback(msg types.Message, pkt transport.Packet) error {
 	streamStartMsg, ok := msg.(*types.StreamStartMessage)
 	if !ok {
-		return xerrors.Errorf("Failed to cast to StreamStopMessage message got wrong type: %T", msg)
+		return xerrors.Errorf("Failed to cast to streamStartMessage message got wrong type: %T", msg)
 	}
 	n.streamInfo.registerAvailableStream(streamStartMsg.StreamInfo)
+	return nil
+}
+
+func (n *node) streamRatingMessageCallback(msg types.Message, pkt transport.Packet) error {
+	streamRatingMsg, ok := msg.(*types.StreamRatingMessage)
+	if !ok {
+		return xerrors.Errorf("Failed to cast to streamRatingMessage message got wrong type: %T", msg)
+	}
+	n.streamInfo.processReaction(*streamRatingMsg)
 	return nil
 }
 
@@ -665,6 +811,9 @@ func (n *node) StreamingInit() {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamConnectMessage{}, n.streamConnectMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamStartMessage{}, n.streamStartMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamStopMessage{}, n.streamStopMessageCallback)
+	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamRatingMessage{}, n.streamRatingMessageCallback)
 	n.streamInfo.lastArrivedSeq = make(map[string]uint)
 	n.streamInfo.lastArrived = make(map[string][]types.StreamMessage)
+	n.streamInfo.availableStreams = make(map[string]types.StreamInfo)
+	n.streamInfo.rateMap = make(map[string][]types.StreamRatingMessage)
 }

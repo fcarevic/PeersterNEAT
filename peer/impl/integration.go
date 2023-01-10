@@ -13,16 +13,28 @@ import (
 
 const ROOTDIR = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/video"
 
-func encryptSymmetricKey(symmetricKey []byte, keyID string) ([]byte, error) {
-	return symmetricKey, nil
+func (n *node) encryptSymmetricKey(symmetricKey []byte, address string) ([]byte, error) {
+
+	pk, err := n.GetPublicKey(address)
+	if err != nil {
+		log.Error().Msgf("[%s]: Failed to get the public key for %s", n.conf.Socket.GetAddress(), address)
+		return nil, err
+	}
+	encryptedKey, err := encryptMsg(symmetricKey, pk)
+	if err != nil {
+		log.Error().Msgf("[%s]: Failed to encrypt the symmetric key for %s", n.conf.Socket.GetAddress(), address)
+		return nil, err
+	}
+	return encryptedKey, nil
 }
 
-func decryptSymmetricKey(encryptedSymmetricKey []byte, keyID string) ([]byte, error) {
-	return encryptedSymmetricKey, nil
-}
-
-func (s *StreamInfo) getGrade(streamID string) (float64, error) {
-	return 0, nil
+func (n *node) decryptSymmetricKey(encryptedSymmetricKey []byte, address string) ([]byte, error) {
+	decryptedKey, err := decryptMsg(encryptedSymmetricKey, n.pkiInfo.privateKey)
+	if err != nil {
+		log.Error().Msgf("[%s]: Failed to encrypt the symmetric key for %s", n.conf.Socket.GetAddress(), address)
+		return nil, err
+	}
+	return decryptedKey, nil
 }
 
 func (n *node) StreamFFMPG4(

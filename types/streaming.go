@@ -123,6 +123,30 @@ func (sc StreamDataMessage) HTML() string {
 }
 
 // -----------------------------------------------------------------------------
+// StreamRatingMessage
+
+// NewEmpty implements types.Message.
+func (sc StreamRatingMessage) NewEmpty() Message {
+	return &StreamRatingMessage{}
+}
+
+// Name implements types.Message.
+func (sc StreamRatingMessage) Name() string {
+	return "streamratingmessage"
+}
+
+// String implements types.Message.
+func (sc StreamRatingMessage) String() string {
+	return fmt.Sprintf("StreamRatingMessage{streamID:%s}",
+		sc.StreamerID[:8])
+}
+
+// HTML implements types.Message.
+func (sc StreamRatingMessage) HTML() string {
+	return sc.String()
+}
+
+// -----------------------------------------------------------------------------
 // StreamAcceptedMessage
 
 // NewEmpty implements types.Message.

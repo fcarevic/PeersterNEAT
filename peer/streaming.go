@@ -24,8 +24,8 @@ type Streaming interface {
 	// ConnectToStream Join the stream with corresponding ID. Returns error if the stream does not exist or the join was unsuccessful.
 	ConnectToStream(streamID string, streamerID string) error
 
-	// Disconnect from stream, returns error if not connected or the stream does not exist
-	//DisconnectFromStream(streamID string) error
+	// ReactToStream send reaction for streamID
+	ReactToStream(streamID string, streamerID string, grade float64) error
 
 	// GetNextChunks returns numberOfChunks last received chunks for the streamID. returns error if the chunk does not exist.
 	GetNextChunks(streamID string, numberOfChunks int) ([]types.StreamMessage, error)

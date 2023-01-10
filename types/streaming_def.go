@@ -76,6 +76,19 @@ type StreamMessage struct {
 	Data StreamData
 }
 
+// StreamRatingMessage contains the rate for the stream
+type StreamRatingMessage struct {
+
+	// StreamID id of the stream
+	StreamID string
+
+	// StreamerID id of the streamer
+	StreamerID string
+
+	// StreamInfo contains all information about the stream
+	Grade float64
+}
+
 // StreamDataMessage contains encrypted stream data
 type StreamDataMessage struct {
 	// ID contains streamID

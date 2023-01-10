@@ -60,7 +60,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			mapClients:        make(map[string][]string),
 			mapKeysListening:  make(map[string][]byte),
 			mapListening:      make(map[string][]types.StreamMessage),
-			availableStreams:  make([]types.StreamInfo, 0),
+			availableStreams:  make(map[string]types.StreamInfo),
 			mapFFMPG4channels: make(map[string]chan types.StreamMessage),
 		},
 		multicstInfo: MulticastInfo{
@@ -119,16 +119,16 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
 
-	//TODO:Just for testing, should be deleted
-	if n.conf.Socket.GetAddress() != "127.0.0.1:31111" {
-		n.AddPeer("127.0.0.1:31111")
-	}
-	if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
-		n.AddPeer("127.0.0.1:32222")
-	}
-	if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
-		n.AddPeer("127.0.0.1:33333")
-	}
+	////TODO:Just for testing, should be deleted
+	//if n.conf.Socket.GetAddress() != "127.0.0.1:31111" {
+	//	n.AddPeer("127.0.0.1:31111")
+	//}
+	//if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
+	//	n.AddPeer("127.0.0.1:32222")
+	//}
+	//if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
+	//	n.AddPeer("127.0.0.1:33333")
+	//}
 	return &n
 }
 

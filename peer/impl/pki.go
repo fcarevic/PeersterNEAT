@@ -210,7 +210,12 @@ func (n *node) CreateConfidentialityMsg(msg transport.Message, publicKey *rsa.Pu
 	return &msgToSend, nil
 }
 
-func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey) ([]byte, error) {
+func (n *node) SendEncryptedMsg(msg transport.Message, dest string) ([]byte, error) {
+	publicKey, err := n.GetPublicKey(dest)
+	if err != nil {
+		return nil, err
+	}
+
 	buf, err := json.Marshal(&msg)
 	if err != nil {
 		return nil, err
@@ -240,7 +245,28 @@ func (n *node) SendEncryptedMsg(msg transport.Message, publicKey *rsa.PublicKey)
 	if err != nil {
 		return nil, err
 	}
-	return msgToSend.CipherMessage, n.Broadcast(transportMsg)
+
+	err = n.Unicast(dest, transportMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	//Maybe just add chat message idk?
+	//Maybe it is ok to just call process message on all message types?
+	if msg.Type == (types.ChatMessage{}).Name() {
+		address := n.conf.Socket.GetAddress()
+		localHeader := transport.NewHeader(address, address, dest, TTL)
+		localPkt := transport.Packet{
+			Header: &localHeader,
+			Msg:    &msg,
+		}
+		err = n.conf.MessageRegistry.ProcessPacket(localPkt)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return msgToSend.CipherMessage, nil
 }
 
 func (n *node) DecryptedMsg(cipherMsg []byte, privateKey *rsa.PrivateKey) ([]byte, error) {

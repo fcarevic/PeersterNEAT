@@ -40,7 +40,15 @@ func Test_Project_PKI_Init_Blockchain_With_Amount(t *testing.T) {
 	transp := channel.NewTransport()
 	nodes := make([]z.TestNode, numNodes)
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second))
+		node := z.NewTestNode(
+			t,
+			peerFac,
+			transp,
+			"127.0.0.1:0",
+			z.WithTotalPeers(uint(numNodes)),
+			z.WithPaxosID(uint(i+1)),
+			z.WithAntiEntropy(time.Second),
+		)
 		defer node.Stop()
 		nodes[i] = node
 		log.Printf("node %d finish init", i)
@@ -75,7 +83,14 @@ func Test_Project_Init_Blockchain_With_Amount(t *testing.T) {
 	transp := channel.NewTransport()
 	nodes := make([]z.TestNode, numNodes)
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)))
+		node := z.NewTestNode(
+			t,
+			peerFac,
+			transp,
+			"127.0.0.1:0",
+			z.WithTotalPeers(uint(numNodes)),
+			z.WithPaxosID(uint(i+1)),
+		)
 		defer node.Stop()
 		nodes[i] = node
 	}
@@ -117,7 +132,14 @@ func Test_Project_Subscription_Enough_Money(t *testing.T) {
 	nodes := make([]z.TestNode, numNodes)
 
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)))
+		node := z.NewTestNode(
+			t,
+			peerFac,
+			transp,
+			"127.0.0.1:0",
+			z.WithTotalPeers(uint(numNodes)),
+			z.WithPaxosID(uint(i+1)),
+		)
 		defer node.Stop()
 		nodes[i] = node
 	}
@@ -182,7 +204,14 @@ func Test_Project_Subscription_Not_Enough_Money(t *testing.T) {
 	nodes := make([]z.TestNode, numNodes)
 
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)))
+		node := z.NewTestNode(
+			t,
+			peerFac,
+			transp,
+			"127.0.0.1:0",
+			z.WithTotalPeers(uint(numNodes)),
+			z.WithPaxosID(uint(i+1)),
+		)
 		defer node.Stop()
 		nodes[i] = node
 	}
@@ -242,7 +271,14 @@ func Test_Project_Subscription_Check(t *testing.T) {
 	nodes := make([]z.TestNode, numNodes)
 
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)))
+		node := z.NewTestNode(
+			t,
+			peerFac,
+			transp,
+			"127.0.0.1:0",
+			z.WithTotalPeers(uint(numNodes)),
+			z.WithPaxosID(uint(i+1)),
+		)
 		defer node.Stop()
 		nodes[i] = node
 	}
@@ -304,7 +340,14 @@ func Test_Project_Message_Encryption_Decryption(t *testing.T) {
 	nodes := make([]z.TestNode, numNodes)
 
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)))
+		node := z.NewTestNode(
+			t,
+			peerFac,
+			transp,
+			"127.0.0.1:0",
+			z.WithTotalPeers(uint(numNodes)),
+			z.WithPaxosID(uint(i+1)),
+		)
 		defer node.Stop()
 		log.Printf("i: %d", i)
 		nodes[i] = node
@@ -339,9 +382,7 @@ func Test_Project_Message_Encryption_Decryption(t *testing.T) {
 	msgToSend := types.ChatMessage{Message: "hello world"}
 	expectedMsg, err := standard.NewRegistry().MarshalMessage(msgToSend)
 	require.NoError(t, err)
-	publicKey, err := nodes[1].GetPublicKey(nodes[0].GetAddr())
-	require.NoError(t, err)
-	cipherMsg, err := nodes[1].SendEncryptedMsg(expectedMsg, publicKey)
+	cipherMsg, err := nodes[1].SendEncryptedMsg(expectedMsg, nodes[0].GetAddr())
 	require.NoError(t, err)
 	plaintextDec, err := nodes[0].DecryptedMsg(cipherMsg, privateKeyMy)
 	require.NoError(t, err)

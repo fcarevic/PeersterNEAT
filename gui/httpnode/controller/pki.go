@@ -30,46 +30,6 @@ type PKISendBody struct {
 	publicKey *rsa.PublicKey
 }
 
-func (c pki) PKISend() http.HandlerFunc {
-	// pozvati ficinu fju za registrovanje poruke da andrija ne pamti na frontu - opciono
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			buf, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			res := PKISendBody{}
-			err = json.Unmarshal(buf, &res)
-			if err != nil {
-				http.Error(
-					w, "failed To unmarshal addPeerArgument: "+err.Error(),
-					http.StatusInternalServerError,
-				)
-				return
-			}
-			fmt.Println("asd")
-			msg, err := c.node.SendEncryptedMsg(res.msg, res.publicKey)
-			if err != nil {
-				return
-			}
-			_, err = w.Write(msg)
-			if err != nil {
-				return
-			}
-		case http.MethodOptions:
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Headers", "*")
-			return
-		default:
-			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
-		}
-	}
-}
-
 type PKIDecryptBody struct {
 	cipherMsg  []byte
 	privateKey *rsa.PrivateKey
@@ -409,14 +369,6 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 				return
 			}
 
-			key, err := p.node.GetPublicKey(res.To)
-			if err != nil {
-				http.Error(
-					w, "failed To get public key: "+err.Error(),
-					http.StatusInternalServerError,
-				)
-				return
-			}
 			msg := types.ChatMessage{Message: res.Body}
 			payload, err := json.Marshal(msg)
 			if err != nil {
@@ -431,7 +383,7 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 				Payload: payload,
 			}
 
-			_, err = p.node.SendEncryptedMsg(transportMsg, key)
+			_, err = p.node.SendEncryptedMsg(transportMsg, res.To)
 			if err != nil {
 				http.Error(
 					w, "failed To send private message: "+err.Error(),

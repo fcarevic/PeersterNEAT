@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/rs/zerolog"
 	"go.dedis.ch/cs438/peer"
 	"io"
@@ -52,7 +53,7 @@ func (c crowds) CrowdsSend() http.HandlerFunc {
 				)
 				return
 			}
-
+			fmt.Println(res)
 			err = c.node.CrowdsSend(res.Peers, res.Body, res.To)
 			if err != nil {
 				http.Error(w, "failed To send crowds message: "+err.Error(), http.StatusInternalServerError)

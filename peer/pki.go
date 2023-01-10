@@ -7,7 +7,7 @@ import (
 
 // Crowds defines the functions for crowds messaging
 type PKI interface {
-	SendEncryptedMsg(transport.Message, *rsa.PublicKey) ([]byte, error)
+	SendEncryptedMsg(transport.Message, string) ([]byte, error)
 	DecryptedMsg([]byte, *rsa.PrivateKey) ([]byte, error)
 	GetPublicKey(string) (*rsa.PublicKey, error)
 	GetAmount(string) (float64, error)

@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"fmt"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
@@ -20,12 +21,18 @@ type CrowdsInfo struct {
 /*
  */
 func (n *node) CrowdsSend(peers []string, body, to string) error {
+	peers = append(peers, n.conf.Socket.GetAddress())
 	crowdsMessagingReqMsgMarshalled, err := n.CreateCrowdsMessagingRequest(to, body)
 	if err != nil {
 		return err
 	}
 
 	err = n.SendCrowdsMessage(&crowdsMessagingReqMsgMarshalled, peers)
+	if err != nil {
+		return err
+	}
+	n.chatInfo.AddMessage(body, to)
+
 	return nil
 }
 
@@ -104,9 +111,11 @@ func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Mess
 	if err != nil {
 		return transport.Message{}, err
 	}
-
+	fmt.Println("asd")
+	fmt.Println("******************")
 	publicKey, err := n.GetPublicKey(dst)
 	if err != nil {
+		fmt.Println("error: " + err.Error())
 		return transport.Message{}, err
 	}
 
@@ -141,9 +150,18 @@ func (n *node) CreateCrowdsDownloadRequest(reqID, content string) (transport.Mes
 func (n *node) CrowdsInit(conf peer.Configuration) {
 	log.Info().Msgf("Registering crowds-callbacks for node %s", conf.Socket.GetAddress())
 	conf.MessageRegistry.RegisterMessageCallback(types.CrowdsMessage{}, n.CrowdsMessageCallback)
-	conf.MessageRegistry.RegisterMessageCallback(types.CrowdsMessagingRequestMessage{}, n.CrowdsMessagingRequestMessageCallback)
-	conf.MessageRegistry.RegisterMessageCallback(types.CrowdsDownloadRequestMessage{}, n.CrowdsDownloadRequestMessageCallback)
-	conf.MessageRegistry.RegisterMessageCallback(types.CrowdsDownloadReplyMessage{}, n.CrowdsDownloadReplyMessageCallback)
+	conf.MessageRegistry.RegisterMessageCallback(
+		types.CrowdsMessagingRequestMessage{},
+		n.CrowdsMessagingRequestMessageCallback,
+	)
+	conf.MessageRegistry.RegisterMessageCallback(
+		types.CrowdsDownloadRequestMessage{},
+		n.CrowdsDownloadRequestMessageCallback,
+	)
+	conf.MessageRegistry.RegisterMessageCallback(
+		types.CrowdsDownloadReplyMessage{},
+		n.CrowdsDownloadReplyMessageCallback,
+	)
 }
 
 func (n *node) CrowdsDestroy() {
@@ -246,7 +264,12 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 	return nil
 }
 
-func (n *node) TransmitChunk(chunk []byte, chunkIdx uint, numChunks int, msg *types.CrowdsDownloadRequestMessage) error {
+func (n *node) TransmitChunk(
+	chunk []byte,
+	chunkIdx uint,
+	numChunks int,
+	msg *types.CrowdsDownloadRequestMessage,
+) error {
 	crowdsDownloadReplyMsg := types.CrowdsDownloadReplyMessage{
 		RequestID:   msg.RequestID,
 		Key:         msg.Key,

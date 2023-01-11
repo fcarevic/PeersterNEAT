@@ -651,7 +651,7 @@ func (n *node) ReactToStream(streamID string, streamerID string, grade float64) 
 func (n *node) GetAllStreams() []types.StreamInfo {
 	n.streamInfo.streamInfoMutex.Lock()
 	defer n.streamInfo.streamInfoMutex.Unlock()
-	tmp := make([]types.StreamInfo, len(n.streamInfo.availableStreams))
+	tmp := make([]types.StreamInfo, 0)
 	for _, val := range n.streamInfo.availableStreams {
 		tmp = append(tmp, val)
 	}

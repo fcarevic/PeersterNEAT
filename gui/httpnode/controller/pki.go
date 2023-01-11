@@ -135,10 +135,8 @@ func (c pki) PKIAmount() http.HandlerFunc {
 			address := r.URL.Query().Get("address")
 
 			amount, err := c.node.GetAmount(address)
-			fmt.Println(amount)
-			fmt.Println(err)
 			if err != nil {
-				http.Error(w, "error getting amount", http.StatusInternalServerError)
+				http.Error(w, "error getting Amount", http.StatusInternalServerError)
 				return
 			}
 			marshal, err := json.Marshal(amount)
@@ -160,8 +158,10 @@ func (c pki) PKIAmount() http.HandlerFunc {
 }
 
 type PKIPaySubscriptionBody struct {
-	senderAddress, receiverAddress, streamID string
-	amount                                   float64
+	SenderAddress   string  `json:"senderAddress"`
+	ReceiverAddress string  `json:"receiverAddress"`
+	StreamID        string  `json:"streamID"`
+	Amount          float64 `json:"amount"`
 }
 
 func (c pki) PKIPaySubscription() http.HandlerFunc {
@@ -170,6 +170,7 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
+			fmt.Println("asd")
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
 				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
@@ -185,8 +186,7 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 				)
 				return
 			}
-
-			err = c.node.PaySubscription(res.senderAddress, res.receiverAddress, res.streamID, res.amount)
+			err = c.node.PaySubscription(res.SenderAddress, res.ReceiverAddress, res.StreamID, res.Amount)
 			if err != nil {
 				return
 			}

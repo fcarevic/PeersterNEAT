@@ -35,12 +35,13 @@ type StartStreamBody struct {
 }
 
 type Stream struct {
-	StreamId string  `json:"streamId"`
-	Name     string  `json:"name"`
-	Price    uint    `json:"price"`
-	Grade    float64 `json:"grade"`
-	Viewers  uint    `json:"viewers"`
-	Image    string  `json:"image"`
+	StreamId   string  `json:"streamId"`
+	Name       string  `json:"name"`
+	Price      uint    `json:"price"`
+	Grade      float64 `json:"grade"`
+	Viewers    uint    `json:"viewers"`
+	Image      string  `json:"image"`
+	StreamerId string  `json:"streamerId"`
 }
 
 func NewStreaming(node peer.Peer, log *zerolog.Logger) streaming {
@@ -222,14 +223,16 @@ func (s streaming) GetStreams() http.HandlerFunc {
 			streamInfos := s.node.GetAllStreams()
 			streams := make([]Stream, 0)
 			for _, streamInfo := range streamInfos {
+				fmt.Println("StreamerId: " + streamInfo.StreamerID)
 				streams = append(
 					streams, Stream{
-						StreamId: streamInfo.StreamID,
-						Name:     streamInfo.Name,
-						Price:    streamInfo.Price,
-						Grade:    streamInfo.Grade,
-						Viewers:  streamInfo.CurrentlyWatching,
-						Image:    base64.StdEncoding.EncodeToString(streamInfo.Thumbnail),
+						StreamId:   streamInfo.StreamID,
+						Name:       streamInfo.Name,
+						Price:      streamInfo.Price,
+						Grade:      streamInfo.Grade,
+						Viewers:    streamInfo.CurrentlyWatching,
+						Image:      base64.StdEncoding.EncodeToString(streamInfo.Thumbnail),
+						StreamerId: streamInfo.StreamerID,
 					},
 				)
 			}

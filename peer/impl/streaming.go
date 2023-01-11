@@ -363,6 +363,7 @@ func (n *node) AnnounceStartStreaming(name string, price uint, thumbnail []byte)
 		Price:             price,
 		CurrentlyWatching: 0,
 		Thumbnail:         thumbnail,
+		StreamerID:        n.conf.Socket.GetAddress(),
 	}
 
 	errB := n.broadcastStartStreaming(streamInfo)
@@ -527,8 +528,10 @@ func (n *node) ConnectToStream(streamID string, streamerID string) error {
 
 	errPaySubscription := n.PaySubscription(n.conf.Socket.GetAddress(), streamerID, streamID, float64(streamInfo.Price))
 	if errPaySubscription != nil {
-		log.Error().Msgf("[%s]ConnectToStream: PaySubscriptionError:%s",
-			n.conf.Socket.GetAddress(), errPaySubscription.Error())
+		log.Error().Msgf(
+			"[%s]ConnectToStream: PaySubscriptionError:%s",
+			n.conf.Socket.GetAddress(), errPaySubscription.Error(),
+		)
 		return errPaySubscription
 	}
 
@@ -627,15 +630,19 @@ func (n *node) ReactToStream(streamID string, streamerID string, grade float64) 
 	// Marshall msg
 	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(reactMsg)
 	if errMarshall != nil {
-		log.Error().Msgf("[%s]:ReactToStream: Error marshalling: %s",
-			n.conf.Socket.GetAddress(), errMarshall.Error())
+		log.Error().Msgf(
+			"[%s]:ReactToStream: Error marshalling: %s",
+			n.conf.Socket.GetAddress(), errMarshall.Error(),
+		)
 		return errMarshall
 	}
 
 	errUnicast := n.Unicast(streamerID, transportMsg)
 	if errUnicast != nil {
-		log.Error().Msgf("[%s]:ReactToStream: Error unicast: %s",
-			n.conf.Socket.GetAddress(), errUnicast.Error())
+		log.Error().Msgf(
+			"[%s]:ReactToStream: Error unicast: %s",
+			n.conf.Socket.GetAddress(), errUnicast.Error(),
+		)
 		return errUnicast
 	}
 	return nil
@@ -696,15 +703,19 @@ func (n *node) streamConnectMessageCallback(msg types.Message, pkt transport.Pac
 	if errInfo != nil {
 		return errInfo
 	}
-	isPayed, errPayed := n.IsPayedSubscription(streamJoinMsg.ClientID, streamJoinMsg.StreamerID,
-		streamJoinMsg.StreamID, float64(streamInfo.Price))
+	isPayed, errPayed := n.IsPayedSubscription(
+		streamJoinMsg.ClientID, streamJoinMsg.StreamerID,
+		streamJoinMsg.StreamID, float64(streamInfo.Price),
+	)
 	if errPayed != nil {
 		return errPayed
 	}
 
 	if !isPayed {
-		log.Info().Msgf("[%s] Not payed subscription: Client: %s, Streamer: %s, Stream %s",
-			n.conf.Socket.GetAddress(), streamJoinMsg.ClientID, streamJoinMsg.StreamerID, streamJoinMsg.StreamID)
+		log.Info().Msgf(
+			"[%s] Not payed subscription: Client: %s, Streamer: %s, Stream %s",
+			n.conf.Socket.GetAddress(), streamJoinMsg.ClientID, streamJoinMsg.StreamerID, streamJoinMsg.StreamID,
+		)
 		return nil
 	}
 

@@ -3,6 +3,7 @@ package impl
 import (
 	"crypto"
 	"encoding/hex"
+	"fmt"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
@@ -103,9 +104,11 @@ func (n *node) Upload(data io.Reader) (metahash string, err error) {
 		chunk := make([]byte, n.conf.ChunkSize)
 		numBytes, errRead := data.Read(chunk)
 		if errRead != nil && errRead != io.EOF {
-			log.Error().Msgf("[%s]: Upload: error while reading the file: %s",
+			log.Error().Msgf(
+				"[%s]: Upload: error while reading the file: %s",
 				n.conf.Socket.GetAddress(),
-				errRead.Error())
+				errRead.Error(),
+			)
 
 			// Delete saved chunks
 			//for _, chunkKey := range addedChunks {
@@ -231,7 +234,8 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 			return bytes, nil
 		case <-time.After(duration):
 			duration = duration * time.Duration(
-				n.conf.BackoffDataRequest.Factor)
+				n.conf.BackoffDataRequest.Factor,
+			)
 			break
 		}
 
@@ -244,10 +248,10 @@ func (n *node) getRandomPeerForDownload(metahash string) (string, error) {
 
 	// Get catalog
 	catalog := n.GetCatalog()
-
 	// Check if exist peers for the metahash
 	var peerMap, ok = catalog[metahash]
 	if !ok {
+		fmt.Println("asd")
 		return "", xerrors.Errorf("No information for random download peer.")
 	}
 
@@ -325,11 +329,13 @@ func (n *node) Tag(name string, mh string) error {
 
 			log.Info().Msgf("[%s] runConse: filename: %s", n.conf.Socket.GetAddress(), name)
 
-			status, errCons := n.runConsensus(types.PaxosValue{
-				UniqID:   xid.New().String(),
-				Metahash: mh,
-				Filename: name,
-			})
+			status, errCons := n.runConsensus(
+				types.PaxosValue{
+					UniqID:   xid.New().String(),
+					Metahash: mh,
+					Filename: name,
+				},
+			)
 
 			// Wait for the end of paxos clock
 			//<-channel
@@ -394,10 +400,12 @@ func (n *node) SearchAll(reg regexp.Regexp, budget uint, timeout time.Duration) 
 
 func (n *node) getFilenamesFromLocalStorage() []string {
 	var localNames []string
-	n.conf.Storage.GetNamingStore().ForEach(func(key string, val []byte) bool {
-		localNames = append(localNames, key)
-		return true
-	})
+	n.conf.Storage.GetNamingStore().ForEach(
+		func(key string, val []byte) bool {
+			localNames = append(localNames, key)
+			return true
+		},
+	)
 	return localNames
 }
 
@@ -468,7 +476,8 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (name
 		if !n.sendSearchRequestRandomly(initialBudget, id, pattern) {
 			log.Info().Msgf(
 				"[%s]:sendSearchRequestRandomly: false",
-				n.conf.Socket.GetAddress())
+				n.conf.Socket.GetAddress(),
+			)
 			return "", nil
 		}
 
@@ -515,7 +524,8 @@ func (n *node) sendSearchRequestRandomly(budget uint, id string, pattern regexp.
 	log.Info().Msgf(
 		"[%s]:sendSearchRequestRandomly: sneds to peeers: %s",
 		n.conf.Socket.GetAddress(),
-		peers)
+		peers,
+	)
 	if len(peers) == 0 {
 		return false
 	}
@@ -542,15 +552,19 @@ func (n *node) sendSearchRequestRandomly(budget uint, id string, pattern regexp.
 		// Serialize request
 		transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(searchRequest)
 		if errCast != nil {
-			log.Error().Msgf("[%s] SearchAll:Failed to marshall the message : %s",
-				n.conf.Socket.GetAddress(), errCast.Error())
+			log.Error().Msgf(
+				"[%s] SearchAll:Failed to marshall the message : %s",
+				n.conf.Socket.GetAddress(), errCast.Error(),
+			)
 		}
 
 		// Send request
 		errSend := n.Unicast(peerAddress, transportMsg)
 		if errSend != nil {
-			log.Error().Msgf("[%s] SearchAll:Failed to send the message : %s",
-				n.conf.Socket.GetAddress(), errSend.Error())
+			log.Error().Msgf(
+				"[%s] SearchAll:Failed to send the message : %s",
+				n.conf.Socket.GetAddress(), errSend.Error(),
+			)
 		}
 	}
 	return true
@@ -558,8 +572,10 @@ func (n *node) sendSearchRequestRandomly(budget uint, id string, pattern regexp.
 func (n *node) notifyFullyKnown(requestID string, filename string) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Error().Msgf("[%s]: notifyFullyKnown: Panic on sending on the channel",
-				n.conf.Socket.GetAddress())
+			log.Error().Msgf(
+				"[%s]: notifyFullyKnown: Panic on sending on the channel",
+				n.conf.Socket.GetAddress(),
+			)
 		}
 	}()
 	//Acquire lock
@@ -569,7 +585,8 @@ func (n *node) notifyFullyKnown(requestID string, filename string) {
 	log.Info().Msgf(
 		"[%s] received fully known %s",
 		n.conf.Socket.GetAddress(),
-		filename)
+		filename,
+	)
 	if ok {
 		channel <- filename
 	}
@@ -657,22 +674,29 @@ func (n *node) handleSearchRequestLocally(searchRequestMsg types.SearchRequestMe
 		n.conf.Socket.GetAddress(),
 		n.conf.Socket.GetAddress(),
 		searchRequestMsg.Origin,
-		replyMsg)
+		replyMsg,
+	)
 	if errPkt != nil {
-		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to craft packet: %s",
-			n.conf.Socket.GetAddress(), errPkt.Error())
+		log.Error().Msgf(
+			"[%s] searchRequestMessageCallback: Unable to craft packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error(),
+		)
 	}
 	// Send packet
 	errSend := n.conf.Socket.Send(pkt.Header.Source, packet, TIMEOUT)
 	if errSend != nil {
-		log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send packet: %s",
-			n.conf.Socket.GetAddress(), errPkt.Error())
+		log.Error().Msgf(
+			"[%s] searchRequestMessageCallback: Unable to send packet: %s",
+			n.conf.Socket.GetAddress(), errPkt.Error(),
+		)
 	}
 
 }
 
-func (n *node) forwardRequestToNeighbours(budget uint, searchRequestMsg types.SearchRequestMessage,
-	pkt transport.Packet) {
+func (n *node) forwardRequestToNeighbours(
+	budget uint, searchRequestMsg types.SearchRequestMessage,
+	pkt transport.Packet,
+) {
 	var peers []string
 	var excludedPeers = []string{searchRequestMsg.Origin, pkt.Header.RelayedBy}
 	for uint(len(peers)) < budget {
@@ -697,15 +721,21 @@ func (n *node) forwardRequestToNeighbours(budget uint, searchRequestMsg types.Se
 		}
 		transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(msg)
 		if errCast != nil {
-			log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to marshall msg: %s",
-				n.conf.Socket.GetAddress(), errCast.Error())
+			log.Error().Msgf(
+				"[%s] searchRequestMessageCallback: Unable to marshall msg: %s",
+				n.conf.Socket.GetAddress(), errCast.Error(),
+			)
 		}
-		log.Info().Msgf("[%s] Relay search from %s req to %s",
-			n.conf.Socket.GetAddress(), searchRequestMsg.Origin, peerAddress)
+		log.Info().Msgf(
+			"[%s] Relay search from %s req to %s",
+			n.conf.Socket.GetAddress(), searchRequestMsg.Origin, peerAddress,
+		)
 		errSend := n.Unicast(peerAddress, transportMsg)
 		if errSend != nil {
-			log.Error().Msgf("[%s] searchRequestMessageCallback: Unable to send unicast: %s",
-				n.conf.Socket.GetAddress(), errSend.Error())
+			log.Error().Msgf(
+				"[%s] searchRequestMessageCallback: Unable to send unicast: %s",
+				n.conf.Socket.GetAddress(), errSend.Error(),
+			)
 		}
 
 	}

@@ -253,3 +253,43 @@ func (s streaming) GetStreams() http.HandlerFunc {
 		}
 	}
 }
+
+type ReactToStreamBody struct {
+	StreamId   string  `json:"streamId"`
+	StreamerId string  `json:"streamerId"`
+	Grade      float64 `json:"grade"`
+}
+
+func (s streaming) ReactToStream() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			buf, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			res := ReactToStreamBody{}
+			err = json.Unmarshal(buf, &res)
+			if err != nil {
+				http.Error(
+					w, "failed To unmarshal reactToStream body: "+err.Error(),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+			err = s.node.ReactToStream(res.StreamId, res.StreamerId, res.Grade)
+			if err != nil {
+				http.Error(w, "failed to react to stream: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		case http.MethodOptions:
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			return
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+		}
+	}
+}

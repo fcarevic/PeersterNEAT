@@ -128,6 +128,7 @@ func NewHTTPNode(node peer.Peer, conf peer.Configuration) Proxy {
 	mux.HandleFunc("/streaming/announce", http.HandlerFunc(streaming.AnnounceStream()))
 	mux.HandleFunc("/streaming", http.HandlerFunc(streaming.GetStreams()))
 	mux.HandleFunc("/streaming/stop", http.HandlerFunc(streaming.StopStream()))
+	mux.HandleFunc("/streaming/react", http.HandlerFunc(streaming.ReactToStream()))
 
 	mux.HandleFunc(
 		"/", func(w http.ResponseWriter, r *http.Request) {

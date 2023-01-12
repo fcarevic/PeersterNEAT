@@ -2,6 +2,8 @@ package integration
 
 import (
 	"fmt"
+	"go.dedis.ch/cs438/transport/channel"
+	"go.dedis.ch/cs438/transport/udp"
 	"os"
 	"runtime"
 
@@ -10,11 +12,15 @@ import (
 	"go.dedis.ch/cs438/peer/impl"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/transport/proxy"
-	"go.dedis.ch/cs438/transport/udp"
 )
 
 var studentFac peer.Factory = impl.NewPeer
 var referenceFac peer.Factory
+var proxyFac transport.Factory = proxy.NewProxy
+var peerFac peer.Factory = impl.NewPeer
+
+var channelFac transport.Factory = channel.NewTransport
+var udpFac transport.Factory = udp.NewUDP
 
 func init() {
 	path := getPath()
@@ -41,6 +47,3 @@ func getPath() string {
 
 	return bin
 }
-
-var udpFac transport.Factory = udp.NewUDP
-var proxyFac transport.Factory = proxy.NewProxy

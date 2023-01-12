@@ -64,7 +64,7 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for announcement and at least one packet to be sent
-	time.Sleep(time.Millisecond)
+	time.Sleep(time.Second)
 
 	clients, err := node1.GetClients(streamID)
 	require.NoError(t, err)
@@ -74,7 +74,7 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 	require.NoError(t, errStream)
 
 	// Wait for stream to finish
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	n1Ins := node1.GetIns()
 	n1Outs := node1.GetOuts()
@@ -154,12 +154,12 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 	err = node2.ConnectToStream(streamID, node1.GetAddr())
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	clients, err := node1.GetClients(streamID)
 	require.NoError(t, err)
@@ -170,7 +170,7 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for stream to finish
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	// Node 1 should have sent:
 	//    Rumor(StreamStartMessage)
@@ -350,12 +350,12 @@ func Test_Project_SimpleStream(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 	err = node2.ConnectToStream(streamID, node1.GetAddr())
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	clients, err := node1.GetClients(streamID)
 	require.NoError(t, err)
@@ -366,7 +366,7 @@ func Test_Project_SimpleStream(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for stream to finish
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	// Node 1 should have sent:
 	//    Rumor(StreamStartMessage)
@@ -638,12 +638,12 @@ func Test_Project_RelayedStream(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 	err = node3.ConnectToStream(streamID, node1.GetAddr())
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	clients, err := node1.GetClients(streamID)
 	require.NoError(t, err)
@@ -654,7 +654,7 @@ func Test_Project_RelayedStream(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for stream to finish
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	// Node 1 should have sent:
 	//  	Rumor(StreamStartMessage)
@@ -881,7 +881,7 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 	err = node3.ConnectToStream(streamID, node1.GetAddr())
 	require.NoError(t, err)
 
@@ -889,7 +889,7 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for joining to finish
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	clients, err := node1.GetClients(streamID)
 	require.NoError(t, err)
@@ -900,7 +900,7 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for stream to finish
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	// Node 2 should not have any stream messages
 	_, errNode2 := node2.GetNextChunks(streamID, len(chunks))
@@ -1006,7 +1006,7 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 	err = node3.ConnectToStream(streamID, node1.GetAddr())
 	require.NoError(t, err)
 
@@ -1014,13 +1014,13 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for joining to finish
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	err = node3.ReactToStream(streamID, node1.GetAddr(), 5.0)
 	require.NoError(t, err)
 	err = node4.ReactToStream(streamID, node1.GetAddr(), 4.0)
 	require.NoError(t, err)
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(time.Second)
 	clients, err := node1.GetClients(streamID)
 	require.NoError(t, err)
 	require.Len(t, clients, 2)
@@ -1030,7 +1030,7 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for stream to finish
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	// Node 2 should not have any stream messages
 	_, errNode2 := node2.GetNextChunks(streamID, len(chunks))

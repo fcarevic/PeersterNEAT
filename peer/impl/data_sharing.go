@@ -198,6 +198,7 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Info().Msgf("node %s downloading value for mh %s from peer %s", n.conf.Socket.GetAddress(), metahash, peerAddress)
 
 	// Create DataRequestMessage
 	msg := types.DataRequestMessage{
@@ -220,6 +221,7 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 	var i uint
 	for i < n.conf.BackoffDataRequest.Retry {
 		// Send msg
+		log.Info().Msgf("sending unicast for mh %s to peer %s", metahash, peerAddress)
 		errSend := n.Unicast(peerAddress, transportMessage)
 		if errSend != nil {
 			return nil, errSend
@@ -241,6 +243,8 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 
 		i = i + 1
 	}
+
+	log.Info().Msgf("times up for downloading metahash %s", metahash)
 	return nil, xerrors.Errorf("Failed to send")
 }
 

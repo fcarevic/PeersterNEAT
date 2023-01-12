@@ -57,7 +57,7 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 
 // A wants to download file via crowds...
 // A <-> B <-> C <-> D
-func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
+func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
 	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
@@ -98,7 +98,9 @@ func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	mh := "6a0b1d67884e58786e97bc51544cbba4cc3e1279d8ff46da2fa32bcdb44a053e"
 
 	time.Sleep(time.Second * 2)
-	
+
+	log.Info().Msgf("krecem da sredjujem katalog i blob store")
+
 	storage := node1.GetStorage().GetDataBlobStore()
 	storage.Set(c1, chunks[0])
 	storage.Set(mh, []byte(fmt.Sprintf("%s\n%s", c1, c2)))
@@ -132,13 +134,14 @@ func Test_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 
 	filename := "testFile.txt"
 	node2.Tag(filename, mh)
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 3)
 
+	log.Info().Msgf("iniciram crowds download")
 	buf, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
 	require.Equal(t, data, buf)
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 3)
 
 	log.Info().Msgf("Izvolte rezultati: ")
 	log.Info().Msgf("rez node %x: %s %s", 0, node0.GetIns(), node0.GetOuts())

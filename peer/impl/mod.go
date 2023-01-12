@@ -126,9 +126,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
 		n.AddPeer("127.0.0.1:32222")
 	}
-	//if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
-	//	n.AddPeer("127.0.0.1:33333")
-	//}
+	if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
+		n.AddPeer("127.0.0.1:33333")
+	}
 	return &n
 }
 

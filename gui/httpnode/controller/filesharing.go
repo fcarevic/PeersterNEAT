@@ -20,12 +20,17 @@ func NewFileSharing(conf peer.Configuration, log *zerolog.Logger) filesharing {
 	}
 }
 
+type LocalFile struct {
+	Metahash string `json:"metahash"`
+	Type     string `json:"type"`
+}
+
 func (f filesharing) GetLocalFilesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			blobStore := f.conf.Storage.GetDataBlobStore()
-			hashes := make([]string, 0)
+			files := make([]LocalFile, 0)
 			regex, err := regexp.Compile("([a-z0-9]{64}\\n)*[a-z0-9]{64}$")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -34,13 +39,25 @@ func (f filesharing) GetLocalFilesHandler() http.HandlerFunc {
 			blobStore.ForEach(
 				func(key string, val []byte) bool {
 					if regex.Match(val) {
-						hashes = append(hashes, key)
+						files = append(
+							files, LocalFile{
+								Metahash: key,
+								Type:     "Metafile",
+							},
+						)
+					} else {
+						files = append(
+							files, LocalFile{
+								Metahash: key,
+								Type:     "Chunk",
+							},
+						)
 					}
 
 					return true
 				},
 			)
-			js, err := json.Marshal(hashes)
+			js, err := json.Marshal(files)
 			if err != nil {
 				http.Error(w, "error marshalling hashes", http.StatusInternalServerError)
 			}

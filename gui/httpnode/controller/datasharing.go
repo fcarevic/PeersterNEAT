@@ -136,7 +136,11 @@ func (d datasharing) downloadGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := d.node.Download(key)
+	// Update catalog, find the file first.
+	d.node.SearchAll(*regexp.MustCompile(key), 3, time.Second*2)
+
+	mh := d.node.Resolve(key) // get metahash for filename
+	res, err := d.node.Download(mh)
 	if err != nil {
 		http.Error(
 			w, fmt.Sprintf("failed To download: %v", err),

@@ -3,12 +3,13 @@ package main
 
 import (
 	"fmt"
-	"go.dedis.ch/cs438/transport/udp"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"go.dedis.ch/cs438/transport/udp"
 
 	"github.com/rs/zerolog"
 	urfave "github.com/urfave/cli/v2"
@@ -102,6 +103,12 @@ func main() {
 						Usage: "probability to continue mongering",
 						// by default there is a 50% chance to continue
 						// mongering.
+						Value: 0.5,
+					},
+					&urfave.Float64Flag{
+						Name:  "crowdsprobability",
+						Usage: "probability to exit crowds",
+						// by default there is a 50% chance to exit crowds.
 						Value: 0.5,
 					},
 					&urfave.StringFlag{
@@ -207,6 +214,7 @@ func start(c *urfave.Context) error {
 		HeartbeatInterval:   c.Duration("heartbeat"),
 		AckTimeout:          c.Duration("acktimeout"),
 		ContinueMongering:   c.Float64("continuemongering"),
+		CrowdsProbability:   c.Float64("crowdsprobability"),
 
 		ChunkSize: c.Uint("chunksize"),
 		BackoffDataRequest: peer.Backoff{

@@ -46,6 +46,29 @@ func (s *StreamInfo) processReaction(reactMsg types.StreamRatingMessage) {
 	}
 	reactions = append(reactions, reactMsg)
 	s.rateMap[reactMsg.StreamID] = reactions
+	_ = s.getGradeForStreamUnsafe(reactMsg.StreamID)
+}
+
+func (s *StreamInfo) getGradeForStreamUnsafe(streamID string) float64 {
+	reactions, ok := s.rateMap[streamID]
+	if !ok {
+		return 0.0
+	}
+	sum := 0.0
+	for _, reaction := range reactions {
+		sum = sum + reaction.Grade
+	}
+	grade := sum / float64(len(reactions))
+
+	// Update grade in list of all streams
+	log.Info().Msgf("Added reaction for stream %s: %ls", streamID, grade)
+	streamInfo, ok := s.availableStreams[streamID]
+	if !ok {
+		return 0.0
+	}
+	streamInfo.Grade = grade
+	s.availableStreams[streamID] = streamInfo
+	return grade
 }
 
 func (s *StreamInfo) getGradeForStream(streamID string) float64 {
@@ -63,11 +86,13 @@ func (s *StreamInfo) getGradeForStream(streamID string) float64 {
 	grade := sum / float64(len(reactions))
 
 	// Update grade in list of all streams
+	log.Info().Msgf("Added reaction for stream %s: %ls", streamID, grade)
 	streamInfo, ok := s.availableStreams[streamID]
 	if !ok {
 		return 0.0
 	}
 	streamInfo.Grade = grade
+	s.availableStreams[streamID] = streamInfo
 	return grade
 }
 

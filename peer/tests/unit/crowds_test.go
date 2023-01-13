@@ -14,6 +14,8 @@ import (
 	"go.dedis.ch/cs438/transport/channel"
 )
 
+// Node 0 sends anonymous message to node 4
+// by building a cluster with nodes 1, 2, 3.
 func Test_Crowds_Messaging_Request(t *testing.T) {
 	numNodes := 5
 	transp := channel.NewTransport()
@@ -41,24 +43,22 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 	}
 	finalNode := nodes[numNodes-1]
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 3)
 
-	err := nodes[0].CrowdsSend(trustedPeers, "hey there :)", finalNode.GetAddr())
+	bodyText := "hey there :)"
+	err := nodes[0].CrowdsSend(trustedPeers, bodyText, finalNode.GetAddr())
 	require.NoError(t, err)
 
 	time.Sleep(time.Second * 2)
 
-	log.Info().Msgf("Izvolte rezultati: ")
-	for i, _ := range nodes {
-		log.Info().Msgf("rez node %x: %s %s", i, nodes[i].GetIns(), nodes[i].GetOuts())
-	}
-
 	chatMsgs := finalNode.GetChatMsgs()
-	log.Info().Msgf("%s", chatMsgs)
+	require.Equal(t, bodyText, chatMsgs[0].Message)
 }
 
-// A wants to download file via crowds...
-// A <-> B <-> C <-> D
+// A wants to download file via crowds. A trusts nodes B, C to form a cluster.
+// The file consists of 2 chunks and 1 metahash. Metahash and chunk1 are at B,
+// chunk2 is on node D.
+// Topology: A <-> B <-> C <-> D
 func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
@@ -121,25 +121,19 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	trustedPeers[2] = node3.GetAddr()
 
 	filename := "testFile.txt"
-	node2.Tag(filename, mh)
+	err := node2.Tag(filename, mh)
+	require.NoError(t, err)
+
 	time.Sleep(time.Second * 3)
 
-	log.Info().Msgf("iniciram crowds download")
 	buf, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
 	require.Equal(t, data, buf)
-
-	time.Sleep(time.Second * 3)
-
-	log.Info().Msgf("Izvolte rezultati: ")
-	log.Info().Msgf("rez node %x: %s %s", 0, node0.GetIns(), node0.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 1, node1.GetIns(), node1.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 2, node2.GetIns(), node2.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 3, node3.GetIns(), node3.GetOuts())
 }
 
-// A wants to download file via crowds...
-// A <-> B <-> C <-> D
+// A wants to download file via crowds. A trusts B,D to form cluster.
+// Whole file is at node C.
+// Topology: A <-> B <-> C <-> D
 func Test_Download_File_With_Upload(t *testing.T) {
 	transp := channel.NewTransport()
 
@@ -175,15 +169,12 @@ func Test_Download_File_With_Upload(t *testing.T) {
 	filename := "proba.mp4"
 	file, err := os.Open(filename)
 	mh, err := node2.Upload(bufio.NewReader(file))
-	if err != nil {
-		log.Error().Msgf("greska u uupload %s", err)
-	}
-	log.Info().Msgf("tagging metahash %s with name %s", mh, filename)
+	require.NoError(t, err)
 
-	node2.Tag(filename, mh)
+	err = node2.Tag(filename, mh)
+	require.NoError(t, err)
+
 	time.Sleep(time.Second * 5)
-	mhNew := node0.Resolve(filename)
-	log.Info().Msgf("metahash resolved %s vs original %s", mhNew, mh)
 
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)
@@ -191,19 +182,10 @@ func Test_Download_File_With_Upload(t *testing.T) {
 	trustedPeers[1] = node1.GetAddr()
 	trustedPeers[2] = node3.GetAddr()
 
-	log.Info().Msgf("pre crowds: ")
 	buf, err := node0.CrowdsDownload(trustedPeers, filename)
+	time.Sleep(time.Second * 2)
 	require.NoError(t, err)
+
 	f, err := os.ReadFile(filename)
 	require.Equal(t, f, buf)
-
-	log.Info().Msgf("pre sleepa: ")
-
-	time.Sleep(time.Second * 2)
-
-	log.Info().Msgf("Izvolte rezultati: ")
-	log.Info().Msgf("rez node %x: %s %s", 0, node0.GetIns(), node0.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 1, node1.GetIns(), node1.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 2, node2.GetIns(), node2.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 3, node3.GetIns(), node3.GetOuts())
 }

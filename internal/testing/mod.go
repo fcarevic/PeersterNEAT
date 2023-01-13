@@ -298,6 +298,13 @@ func WithPaxosProposerRetry(d time.Duration) Option {
 	}
 }
 
+// WithCrowdsProbability specifies the probability used in crowds.
+func WithCrowdsProbability(c float64) Option {
+	return func(ct *configTemplate) {
+		ct.crowdsProbability = c
+	}
+}
+
 // NewTestNode returns a new test node.
 func NewTestNode(t require.TestingT, f peer.Factory, trans transport.Transport,
 	addr string, opts ...Option) TestNode {

@@ -2,15 +2,18 @@ package impl
 
 import (
 	"fmt"
+	"math/rand"
+	"os"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 	"golang.org/x/xerrors"
-	"math/rand"
-	"os"
-	"strings"
 )
 
 type CrowdsInfo struct {
@@ -21,7 +24,10 @@ type CrowdsInfo struct {
 /*
  */
 func (n *node) CrowdsSend(peers []string, body, to string) error {
-	peers = append(peers, n.conf.Socket.GetAddress())
+	if !contains(peers, n.conf.Socket.GetAddress()) {
+		peers = append(peers, n.conf.Socket.GetAddress())
+	}
+
 	crowdsMessagingReqMsgMarshalled, err := n.CreateCrowdsMessagingRequest(to, body)
 	if err != nil {
 		return err
@@ -37,11 +43,16 @@ func (n *node) CrowdsSend(peers []string, body, to string) error {
 }
 
 func (n *node) CrowdsDownload(peers []string, filename string) ([]byte, error) {
+	if !contains(peers, n.conf.Socket.GetAddress()) {
+		peers = append(peers, n.conf.Socket.GetAddress())
+	}
+
 	requestID := xid.New().String()
 	reqChannel := make(chan string)
 	n.crowdsInfo.chunkChannelMap.StoreChannel(requestID, reqChannel)
 
 	metahash := n.Resolve(filename)
+
 	crowdsDownloadReqMsgMarshalled, err := n.CreateCrowdsDownloadRequest(requestID, metahash)
 	if err != nil {
 		return nil, err
@@ -147,6 +158,8 @@ func (n *node) CreateCrowdsDownloadRequest(reqID, content string) (transport.Mes
 		Key:       content,
 	}
 
+	log.Info().Msgf("pravim zahtev za metahash %s", content)
+
 	return n.conf.MessageRegistry.MarshalMessage(crowdsDownloadReqMsg)
 }
 
@@ -190,7 +203,7 @@ func (n *node) CrowdsMessageCallback(msg types.Message, pkt transport.Packet) er
 
 	// If rand > keep crowds msging
 
-	log.Info().Msgf("node %s continues crowds routing", n.conf.Socket.GetAddress())
+	log.Info().Msgf("node %s continues crowds routing jer je prob %f", n.conf.Socket.GetAddress(), n.conf.CrowdsProbability)
 	return n.SendCrowdsMessage(crowdsMsg.Msg, crowdsMsg.Recipients)
 }
 
@@ -211,7 +224,7 @@ func (n *node) CrowdsDownloadRequestMessageCallback(msg types.Message, _ transpo
 		return xerrors.Errorf("wrong type: %T", msg)
 	}
 
-	log.Info().Msgf("node %s CrowdsDownloadRequestMessageCallback", n.conf.Socket.GetAddress())
+	log.Info().Msgf("node %s CrowdsDownloadRequestMessageCallback mh %s", n.conf.Socket.GetAddress(), crowdsDownloadReqMsg.Key)
 	return n.DownloadAndTransmit(crowdsDownloadReqMsg.Key, crowdsDownloadReqMsg)
 }
 
@@ -231,11 +244,21 @@ func (n *node) CrowdsDownloadReplyMessageCallback(msg types.Message, _ transport
 }
 
 func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadRequestMessage) error {
+
+	filename := n.GetFileNameFromMetaHash(metahash)
+	if filename == "" {
+		return xerrors.Errorf("node %s could not find filename for given metahash %s during crowds download", n.conf.Socket.GetAddress(), metahash)
+	}
+
+	// update catalog.
+	n.SearchAll(*regexp.MustCompile(filename), 3, time.Second*2)
+	log.Info().Msgf("moj catalog je %s", n.GetCatalog())
 	log.Info().Msgf("node %s krece download and transmit for metahash %s", n.conf.Socket.GetAddress(), metahash)
 
 	// Get metafile
 	metafileValueBytes, err := n.getValueForMetahash(metahash)
 	if err != nil {
+		log.Error().Msgf("greska vode %s", err.Error())
 		return err
 	}
 
@@ -299,4 +322,18 @@ func (n *node) TransmitChunk(
 
 	log.Info().Msgf("node %s salje transmit", n.conf.Socket.GetAddress())
 	return n.Unicast(msg.Origin, crowdsDownloadReplyMsgMarshalled)
+}
+
+func (n *node) GetFileNameFromMetaHash(metahash string) string {
+	filename := ""
+	n.conf.Storage.GetNamingStore().ForEach(func(key string, val []byte) bool {
+		if metahash != string(val) {
+			return true
+		}
+
+		filename = key
+		return false
+	})
+
+	return filename
 }

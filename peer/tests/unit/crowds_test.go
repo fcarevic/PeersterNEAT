@@ -3,14 +3,15 @@ package unit
 import (
 	"bufio"
 	"fmt"
-	"github.com/rs/zerolog/log"
-	"github.com/stretchr/testify/require"
-	z "go.dedis.ch/cs438/internal/testing"
-	"go.dedis.ch/cs438/transport/channel"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
+	z "go.dedis.ch/cs438/internal/testing"
+	"go.dedis.ch/cs438/transport/channel"
 )
 
 func Test_Crowds_Messaging_Request(t *testing.T) {
@@ -113,24 +114,6 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	storage = node3.GetStorage().GetDataBlobStore()
 	storage.Set(c2, chunks[1])
 
-	// telling node1 that node3 has the data.
-
-	node1.UpdateCatalog(c1, node1.GetAddr())
-	node1.UpdateCatalog(c2, node3.GetAddr())
-	node1.UpdateCatalog(string(mh), node1.GetAddr())
-
-	node2.UpdateCatalog(c1, node1.GetAddr())
-	node2.UpdateCatalog(c2, node3.GetAddr())
-	node2.UpdateCatalog(string(mh), node1.GetAddr())
-
-	node3.UpdateCatalog(c1, node1.GetAddr())
-	node3.UpdateCatalog(c2, node3.GetAddr())
-	node3.UpdateCatalog(string(mh), node1.GetAddr())
-
-	node0.UpdateCatalog(c1, node1.GetAddr())
-	node0.UpdateCatalog(c2, node3.GetAddr())
-	node0.UpdateCatalog(string(mh), node1.GetAddr())
-
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)
 	trustedPeers[0] = node0.GetAddr()
@@ -157,7 +140,7 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 
 // A wants to download file via crowds...
 // A <-> B <-> C <-> D
-func Test_FILES(t *testing.T) {
+func Test_Download_File_With_Upload(t *testing.T) {
 	transp := channel.NewTransport()
 
 	chunkSize := uint(8192 * 10) // The metafile can handle just 3 chunks
@@ -201,17 +184,6 @@ func Test_FILES(t *testing.T) {
 	time.Sleep(time.Second * 5)
 	mhNew := node0.Resolve(filename)
 	log.Info().Msgf("metahash resolved %s vs original %s", mhNew, mh)
-
-	storage := node2.GetStorage().GetDataBlobStore()
-	storage.ForEach(func(key string, val []byte) bool {
-		node0.UpdateCatalog(key, node2.GetAddr())
-		node1.UpdateCatalog(key, node2.GetAddr())
-		node3.UpdateCatalog(key, node2.GetAddr())
-		return true
-	})
-	node0.UpdateCatalog(mh, node2.GetAddr())
-	node1.UpdateCatalog(mh, node2.GetAddr())
-	node3.UpdateCatalog(mh, node2.GetAddr())
 
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)

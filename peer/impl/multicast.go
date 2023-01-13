@@ -64,7 +64,6 @@ func (s *MulticastInfo) removeMulticastClient(streamID string, client string) er
 		return xerrors.Errorf("Multicast client does not exist.")
 	}
 	multicastClients = remove[string](multicastClients, client)
-	// TODO: Add send disconnect msg if the list is empty!
 	s.mapMulticastClients[streamID] = multicastClients
 	return nil
 }
@@ -200,9 +199,6 @@ func (n *node) multicastJoinMessageCallback(msg types.Message, pkt transport.Pac
 	if err != nil {
 		log.Error().Msgf("[%s]multicastJoinMessageCallback: Error while adding a client: %s",
 			n.conf.Socket.GetAddress(), err.Error())
-		if multicastJoinMsg.StreamerID != n.conf.Socket.GetAddress() {
-			return err
-		}
 	}
 
 	if multicastJoinMsg.StreamerID != n.conf.Socket.GetAddress() {
@@ -230,7 +226,7 @@ func (n *node) multicastJoinMessageCallback(msg types.Message, pkt transport.Pac
 	return nil
 }
 
-// Init
+// MulticastInit initializes multicast
 func (n *node) MulticastInit() {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastMessage{}, n.multicastMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.MulticastJoinMessage{}, n.multicastJoinMessageCallback)

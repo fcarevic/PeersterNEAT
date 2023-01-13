@@ -238,6 +238,7 @@ func (s *StreamInfo) getNextChunks(streamID string, numberOfChunks int) ([]types
 	retVal := streamMsgs[:numberOfChunks]
 	s.mapListening[streamID] = streamMsgs[numberOfChunks:]
 	s.lastArrived[streamID] = []types.StreamMessage{}
+	retVal = sortStreamMessages(retVal)
 	return retVal, nil
 }
 
@@ -327,7 +328,7 @@ func (s *StreamInfo) addStreamingKey(streamID string, key []byte) error {
 	return nil
 }
 
-// Starts streaming of provided file. returns the ID of stream.
+// Stream starts streaming of provided file. returns the ID of stream.
 func (n *node) Stream(
 	data io.Reader,
 	name string,
@@ -454,7 +455,7 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 			streamInfo.CurrentlyWatching = uint(len(clients))
 			streamInfo.Grade = n.streamInfo.getGradeForStream(streamInfo.StreamID)
 
-			log.Info().Msgf("GRADE: %ls", streamInfo.Grade)
+			//log.Info().Msgf("GRADE: %ls", streamInfo.Grade)
 			if err != nil {
 				return
 			}
@@ -583,12 +584,12 @@ func (n *node) ConnectToStream(streamID string, streamerID string) error {
 	return n.JoinMulticast(streamID, streamerID, &transportMsg)
 }
 
-// Returns the number of connected streamers for chosen stream
+// GetClients returns the number of connected streamers for chosen stream
 func (n *node) GetClients(streamID string) ([]string, error) {
 	return n.streamInfo.getClients(streamID)
 }
 
-// Stop the stream
+// AnnounceStopStreaming Stops the stream
 func (n *node) AnnounceStopStreaming(streamID string) error {
 
 	_, errC := n.streamInfo.getClients(streamID)
@@ -814,6 +815,9 @@ func (n *node) streamStopMessageCallback(msg types.Message, pkt transport.Packet
 	if !ok {
 		return xerrors.Errorf("Failed to cast to StreamStopMessage message got wrong type: %T", msg)
 	}
+
+	log.Info().Msgf("[%s] STREAM FINISHED  number of packets (sent %d), (received %d) %s",
+		n.conf.Socket.GetAddress())
 	n.streamInfo.unregisterAvailableStream(streamStopMsg.StreamID)
 	err := n.streamInfo.unregisterListening(streamStopMsg.StreamID)
 	if err != nil {
@@ -840,7 +844,7 @@ func (n *node) streamRatingMessageCallback(msg types.Message, pkt transport.Pack
 	return nil
 }
 
-// Init
+// StreamingInit initializes streaming
 func (n *node) StreamingInit() {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamDataMessage{}, n.streamDataMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.StreamAcceptMessage{}, n.streamAcceptMessageCallback)

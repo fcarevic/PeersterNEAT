@@ -20,7 +20,8 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 	nodes := make([]z.TestNode, numNodes)
 
 	for i, _ := range nodes {
-		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second))
+		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+			z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second))
 		defer node.Stop()
 		nodes[i] = node
 	}
@@ -60,10 +61,14 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(2), z.WithAntiEntropy(time.Second))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(3), z.WithAntiEntropy(time.Second))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(4), z.WithAntiEntropy(time.Second))
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithTotalPeers(4), z.WithPaxosID(2), z.WithAntiEntropy(time.Second))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithTotalPeers(4), z.WithPaxosID(3), z.WithAntiEntropy(time.Second))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithTotalPeers(4), z.WithPaxosID(4), z.WithAntiEntropy(time.Second))
 
 	defer node0.Stop()
 	defer node1.Stop()
@@ -157,10 +162,14 @@ func Test_FILES(t *testing.T) {
 
 	chunkSize := uint(8192 * 10) // The metafile can handle just 3 chunks
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithChunkSize(chunkSize), z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
 	defer node0.Stop()
 	defer node1.Stop()
 	defer node2.Stop()

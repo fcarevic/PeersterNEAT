@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const ROOTDIR = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/video"
+//const ROOTDIR = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/video"
 
 func (n *node) encryptSymmetricKey(symmetricKey []byte, address string) ([]byte, error) {
 

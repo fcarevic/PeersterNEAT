@@ -1,7 +1,6 @@
 package impl
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"regexp"
@@ -95,13 +94,13 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		return err
 	}
 
-	peer := n.conf.Socket.GetAddress()
-	for peer == n.conf.Socket.GetAddress() {
+	to := n.conf.Socket.GetAddress()
+	for to == n.conf.Socket.GetAddress() {
 		peerIdx := rand.Intn(len(crowdsMsg.Recipients))
-		peer = crowdsMsg.Recipients[peerIdx]
+		to = crowdsMsg.Recipients[peerIdx]
 	}
 
-	publicKey, err := n.GetPublicKey(peer)
+	publicKey, err := n.GetPublicKey(to)
 	if err != nil {
 		return err
 	}
@@ -116,7 +115,7 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		return err
 	}
 
-	return n.Unicast(peer, confidMsgMarshalled)
+	return n.Unicast(to, confidMsgMarshalled)
 }
 
 func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Message, error) {
@@ -125,11 +124,9 @@ func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Mess
 	if err != nil {
 		return transport.Message{}, err
 	}
-	fmt.Println("create download messaging request")
-	fmt.Println("******************")
+
 	publicKey, err := n.GetPublicKey(dst)
 	if err != nil {
-		fmt.Println("error: " + err.Error())
 		return transport.Message{}, err
 	}
 
@@ -202,7 +199,7 @@ func (n *node) CrowdsMessageCallback(msg types.Message, pkt transport.Packet) er
 	return n.SendCrowdsMessage(crowdsMsg.Msg, crowdsMsg.Recipients)
 }
 
-func (n *node) CrowdsMessagingRequestMessageCallback(msg types.Message, pkt transport.Packet) error {
+func (n *node) CrowdsMessagingRequestMessageCallback(msg types.Message, _ transport.Packet) error {
 	// Cast the message to its actual type. You assume it is the right type.
 	crowdsMessagingReqMsg, ok := msg.(*types.CrowdsMessagingRequestMessage)
 	if !ok {
@@ -245,8 +242,13 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 			n.conf.Socket.GetAddress(), metahash)
 	}
 
-	n.SearchAll(*regexp.MustCompile(filename), 3, time.Second*2) // update catalog.
+	_, err := n.SearchAll(*regexp.MustCompile(filename), 3, time.Second*2) // update catalog.
 	time.Sleep(time.Second * 2)
+	if err != nil {
+		log.Error().Msgf("[%s] error during search all in crowds: %s",
+			n.conf.Socket.GetAddress(), err.Error())
+		return err
+	}
 	log.Info().Msgf("node %s catalog is %s", n.conf.Socket.GetAddress(), n.GetCatalog())
 
 	// Get metafile

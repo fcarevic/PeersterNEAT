@@ -21,7 +21,7 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 
 	nodes := make([]z.TestNode, numNodes)
 
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
 			z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second))
 		defer node.Stop()
@@ -35,7 +35,7 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)
-	for i, _ := range trustedPeers {
+	for i := range trustedPeers {
 		trustedPeers[i] = nodes[i].GetAddr()
 	}
 	finalNode := nodes[numNodes-1]
@@ -167,6 +167,7 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 
 	filename := "proba.mp4"
 	file, err := os.Open(filename)
+	require.NoError(t, err)
 	mh, err := node2.Upload(bufio.NewReader(file))
 	require.NoError(t, err)
 
@@ -186,5 +187,6 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 	require.NoError(t, err)
 
 	f, err := os.ReadFile(filename)
+	require.NoError(t, err)
 	require.Equal(t, f, buf)
 }

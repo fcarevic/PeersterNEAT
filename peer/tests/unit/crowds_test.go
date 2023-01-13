@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -33,8 +32,6 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 			n1.AddPeer(n2.GetAddr())
 		}
 	}
-	wait := sync.WaitGroup{}
-	wait.Add(numNodes)
 
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)
@@ -134,19 +131,19 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 // A wants to download file via crowds. A trusts B,D to form cluster.
 // Whole file is at node C.
 // Topology: A <-> B <-> C <-> D
-func Test_Download_File_With_Upload(t *testing.T) {
-	transp := channel.NewTransport()
+func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 
-	chunkSize := uint(8192 * 10) // The metafile can handle just 3 chunks
+	transp := udpFac() // channel.NewTransport()
 
+	chunkSize := uint(8192 * 10)
 	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	defer node0.Stop()
 	defer node1.Stop()
 	defer node2.Stop()
@@ -166,6 +163,8 @@ func Test_Download_File_With_Upload(t *testing.T) {
 	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
 	node3.SetRoutingEntry(node0.GetAddr(), node2.GetAddr())
 
+	time.Sleep(time.Second * 5)
+
 	filename := "proba.mp4"
 	file, err := os.Open(filename)
 	mh, err := node2.Upload(bufio.NewReader(file))
@@ -174,7 +173,7 @@ func Test_Download_File_With_Upload(t *testing.T) {
 	err = node2.Tag(filename, mh)
 	require.NoError(t, err)
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 3)
 
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)

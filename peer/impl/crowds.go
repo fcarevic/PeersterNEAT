@@ -1,7 +1,6 @@
 package impl
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"regexp"
@@ -21,8 +20,6 @@ type CrowdsInfo struct {
 	chunkChannelMap *AtomicChannelTable
 }
 
-/*
- */
 func (n *node) CrowdsSend(peers []string, body, to string) error {
 	if !contains(peers, n.conf.Socket.GetAddress()) {
 		peers = append(peers, n.conf.Socket.GetAddress())
@@ -52,13 +49,17 @@ func (n *node) CrowdsDownload(peers []string, filename string) ([]byte, error) {
 	n.crowdsInfo.chunkChannelMap.StoreChannel(requestID, reqChannel)
 
 	metahash := n.Resolve(filename)
+	if metahash == "" { // empty metahash
+		metahash = filename
+		log.Info().Msgf("crowds initator = %s; metahash is empty, filename will be used as metahash",
+			n.conf.Socket.GetAddress())
+	}
 
 	crowdsDownloadReqMsgMarshalled, err := n.CreateCrowdsDownloadRequest(requestID, metahash)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info().Msgf("node %s salje crowds zahtev %x na peers %s", n.conf.Socket.GetAddress(), crowdsDownloadReqMsgMarshalled, peers)
 	err = n.SendCrowdsMessage(&crowdsDownloadReqMsgMarshalled, peers)
 	if err != nil {
 		return nil, err
@@ -93,19 +94,18 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		return err
 	}
 
-	peer := n.conf.Socket.GetAddress()
-	for peer == n.conf.Socket.GetAddress() {
+	to := n.conf.Socket.GetAddress()
+	for to == n.conf.Socket.GetAddress() {
 		peerIdx := rand.Intn(len(crowdsMsg.Recipients))
-		peer = crowdsMsg.Recipients[peerIdx]
+		to = crowdsMsg.Recipients[peerIdx]
 	}
 
-	publicKey, err := n.GetPublicKey(peer)
+	publicKey, err := n.GetPublicKey(to)
 	if err != nil {
 		return err
 	}
 
 	confidMsg, err := n.CreateConfidentialityMsg(crowdsMsgMarshalled, publicKey)
-
 	if err != nil {
 		return err
 	}
@@ -115,8 +115,7 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		return err
 	}
 
-	log.Info().Msgf("node %s salje crowds msg na %s", n.conf.Socket.GetAddress(), peer)
-	return n.Unicast(peer, confidMsgMarshalled)
+	return n.Unicast(to, confidMsgMarshalled)
 }
 
 func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Message, error) {
@@ -125,11 +124,9 @@ func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Mess
 	if err != nil {
 		return transport.Message{}, err
 	}
-	fmt.Println("create download messaging request")
-	fmt.Println("******************")
+
 	publicKey, err := n.GetPublicKey(dst)
 	if err != nil {
-		fmt.Println("error: " + err.Error())
 		return transport.Message{}, err
 	}
 
@@ -157,8 +154,6 @@ func (n *node) CreateCrowdsDownloadRequest(reqID, content string) (transport.Mes
 		RequestID: reqID,
 		Key:       content,
 	}
-
-	log.Info().Msgf("pravim zahtev za metahash %s", content)
 
 	return n.conf.MessageRegistry.MarshalMessage(crowdsDownloadReqMsg)
 }
@@ -197,17 +192,14 @@ func (n *node) CrowdsMessageCallback(msg types.Message, pkt transport.Packet) er
 
 	// If rand <= then deliver message
 	if rand.Float64() <= n.conf.CrowdsProbability {
-		log.Info().Msgf("node %s finishes crowds routing", n.conf.Socket.GetAddress())
 		return n.conf.MessageRegistry.ProcessPacket(transport.Packet{Header: pkt.Header, Msg: crowdsMsg.Msg})
 	}
 
 	// If rand > keep crowds msging
-
-	log.Info().Msgf("node %s continues crowds routing jer je prob %f", n.conf.Socket.GetAddress(), n.conf.CrowdsProbability)
 	return n.SendCrowdsMessage(crowdsMsg.Msg, crowdsMsg.Recipients)
 }
 
-func (n *node) CrowdsMessagingRequestMessageCallback(msg types.Message, pkt transport.Packet) error {
+func (n *node) CrowdsMessagingRequestMessageCallback(msg types.Message, _ transport.Packet) error {
 	// Cast the message to its actual type. You assume it is the right type.
 	crowdsMessagingReqMsg, ok := msg.(*types.CrowdsMessagingRequestMessage)
 	if !ok {
@@ -224,7 +216,6 @@ func (n *node) CrowdsDownloadRequestMessageCallback(msg types.Message, _ transpo
 		return xerrors.Errorf("wrong type: %T", msg)
 	}
 
-	log.Info().Msgf("node %s CrowdsDownloadRequestMessageCallback mh %s", n.conf.Socket.GetAddress(), crowdsDownloadReqMsg.Key)
 	return n.DownloadAndTransmit(crowdsDownloadReqMsg.Key, crowdsDownloadReqMsg)
 }
 
@@ -247,18 +238,23 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 
 	filename := n.GetFileNameFromMetaHash(metahash)
 	if filename == "" {
-		return xerrors.Errorf("node %s could not find filename for given metahash %s during crowds download", n.conf.Socket.GetAddress(), metahash)
+		return xerrors.Errorf("node %s could not find filename for given metahash %s during crowds download",
+			n.conf.Socket.GetAddress(), metahash)
 	}
 
-	// update catalog.
-	n.SearchAll(*regexp.MustCompile(filename), 3, time.Second*2)
-	log.Info().Msgf("moj catalog je %s", n.GetCatalog())
-	log.Info().Msgf("node %s krece download and transmit for metahash %s", n.conf.Socket.GetAddress(), metahash)
+	_, err := n.SearchAll(*regexp.MustCompile(filename), 3, time.Second*2) // update catalog.
+	time.Sleep(time.Second * 2)
+	if err != nil {
+		log.Error().Msgf("[%s] error during search all in crowds: %s",
+			n.conf.Socket.GetAddress(), err.Error())
+		return err
+	}
+	log.Info().Msgf("node %s catalog is %s", n.conf.Socket.GetAddress(), n.GetCatalog())
 
 	// Get metafile
 	metafileValueBytes, err := n.getValueForMetahash(metahash)
 	if err != nil {
-		log.Error().Msgf("greska vode %s", err.Error())
+		log.Error().Msgf("could not get name for metahash %s, error: %s", metahash, err.Error())
 		return err
 	}
 
@@ -272,19 +268,15 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 	var mapOfParts = make(map[string][]byte)
 	chunkIdx := uint(0)
 
-	log.Info().Msgf("node %s krece download and transmit ukupno delova %d", n.conf.Socket.GetAddress(), len(fileParts))
-
 	for _, key := range fileParts {
 		// Get value locally or remotely
 
-		log.Info().Msgf("node %s krece da hvata value za key %s", n.conf.Socket.GetAddress(), key)
 		chunk, errValue := n.getValueForMetahash(key)
 		if errValue != nil {
 			return errValue
 		}
 
 		chunkIdx++
-		log.Info().Msgf("node %s krece transmit", n.conf.Socket.GetAddress())
 		err = n.TransmitChunk(chunk, chunkIdx, len(fileParts), msg)
 		if err != nil {
 			return err
@@ -320,7 +312,6 @@ func (n *node) TransmitChunk(
 		return err
 	}
 
-	log.Info().Msgf("node %s salje transmit", n.conf.Socket.GetAddress())
 	return n.Unicast(msg.Origin, crowdsDownloadReplyMsgMarshalled)
 }
 

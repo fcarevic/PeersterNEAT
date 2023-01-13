@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -14,13 +13,15 @@ import (
 	"go.dedis.ch/cs438/transport/channel"
 )
 
+// Node 0 sends anonymous message to node 4
+// by building a cluster with nodes 1, 2, 3.
 func Test_Crowds_Messaging_Request(t *testing.T) {
 	numNodes := 5
 	transp := channel.NewTransport()
 
 	nodes := make([]z.TestNode, numNodes)
 
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
 			z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second))
 		defer node.Stop()
@@ -31,34 +32,30 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 			n1.AddPeer(n2.GetAddr())
 		}
 	}
-	wait := sync.WaitGroup{}
-	wait.Add(numNodes)
 
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)
-	for i, _ := range trustedPeers {
+	for i := range trustedPeers {
 		trustedPeers[i] = nodes[i].GetAddr()
 	}
 	finalNode := nodes[numNodes-1]
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 3)
 
-	err := nodes[0].CrowdsSend(trustedPeers, "hey there :)", finalNode.GetAddr())
+	bodyText := "hey there :)"
+	err := nodes[0].CrowdsSend(trustedPeers, bodyText, finalNode.GetAddr())
 	require.NoError(t, err)
 
 	time.Sleep(time.Second * 2)
 
-	log.Info().Msgf("Izvolte rezultati: ")
-	for i, _ := range nodes {
-		log.Info().Msgf("rez node %x: %s %s", i, nodes[i].GetIns(), nodes[i].GetOuts())
-	}
-
 	chatMsgs := finalNode.GetChatMsgs()
-	log.Info().Msgf("%s", chatMsgs)
+	require.Equal(t, bodyText, chatMsgs[0].Message)
 }
 
-// A wants to download file via crowds...
-// A <-> B <-> C <-> D
+// A wants to download file via crowds. A trusts nodes B, C to form a cluster.
+// The file consists of 2 chunks and 1 metahash. Metahash and chunk1 are at B,
+// chunk2 is on node D.
+// Topology: A <-> B <-> C <-> D
 func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
@@ -121,38 +118,32 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	trustedPeers[2] = node3.GetAddr()
 
 	filename := "testFile.txt"
-	node2.Tag(filename, mh)
+	err := node2.Tag(filename, mh)
+	require.NoError(t, err)
+
 	time.Sleep(time.Second * 3)
 
-	log.Info().Msgf("iniciram crowds download")
 	buf, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
 	require.Equal(t, data, buf)
-
-	time.Sleep(time.Second * 3)
-
-	log.Info().Msgf("Izvolte rezultati: ")
-	log.Info().Msgf("rez node %x: %s %s", 0, node0.GetIns(), node0.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 1, node1.GetIns(), node1.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 2, node2.GetIns(), node2.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 3, node3.GetIns(), node3.GetOuts())
 }
 
-// A wants to download file via crowds...
-// A <-> B <-> C <-> D
-func Test_Download_File_With_Upload(t *testing.T) {
-	transp := channel.NewTransport()
+// A wants to download file via crowds. A trusts B,D to form cluster.
+// Whole file is at node C.
+// Topology: A <-> B <-> C <-> D
+func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 
-	chunkSize := uint(8192 * 10) // The metafile can handle just 3 chunks
+	transp := udpFac() // channel.NewTransport()
 
+	chunkSize := uint(8192 * 10)
 	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	defer node0.Stop()
 	defer node1.Stop()
 	defer node2.Stop()
@@ -172,18 +163,18 @@ func Test_Download_File_With_Upload(t *testing.T) {
 	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
 	node3.SetRoutingEntry(node0.GetAddr(), node2.GetAddr())
 
+	time.Sleep(time.Second * 5)
+
 	filename := "proba.mp4"
 	file, err := os.Open(filename)
+	require.NoError(t, err)
 	mh, err := node2.Upload(bufio.NewReader(file))
-	if err != nil {
-		log.Error().Msgf("greska u uupload %s", err)
-	}
-	log.Info().Msgf("tagging metahash %s with name %s", mh, filename)
+	require.NoError(t, err)
 
-	node2.Tag(filename, mh)
-	time.Sleep(time.Second * 5)
-	mhNew := node0.Resolve(filename)
-	log.Info().Msgf("metahash resolved %s vs original %s", mhNew, mh)
+	err = node2.Tag(filename, mh)
+	require.NoError(t, err)
+
+	time.Sleep(time.Second * 3)
 
 	numTrustedPeers := 3
 	trustedPeers := make([]string, numTrustedPeers)
@@ -191,19 +182,11 @@ func Test_Download_File_With_Upload(t *testing.T) {
 	trustedPeers[1] = node1.GetAddr()
 	trustedPeers[2] = node3.GetAddr()
 
-	log.Info().Msgf("pre crowds: ")
 	buf, err := node0.CrowdsDownload(trustedPeers, filename)
-	require.NoError(t, err)
-	f, err := os.ReadFile(filename)
-	require.Equal(t, f, buf)
-
-	log.Info().Msgf("pre sleepa: ")
-
 	time.Sleep(time.Second * 2)
+	require.NoError(t, err)
 
-	log.Info().Msgf("Izvolte rezultati: ")
-	log.Info().Msgf("rez node %x: %s %s", 0, node0.GetIns(), node0.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 1, node1.GetIns(), node1.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 2, node2.GetIns(), node2.GetOuts())
-	log.Info().Msgf("rez node %x: %s %s", 3, node3.GetIns(), node3.GetOuts())
+	f, err := os.ReadFile(filename)
+	require.NoError(t, err)
+	require.Equal(t, f, buf)
 }

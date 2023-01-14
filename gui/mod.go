@@ -111,6 +111,24 @@ func main() {
 						// by default there is a 50% chance to exit crowds.
 						Value: 0.5,
 					},
+					&urfave.BoolFlag{
+						Name:  "noencryption",
+						Usage: "use encryption in crowds",
+						// by default use encryption.
+						Value: false,
+					},
+					&urfave.BoolFlag{
+						Name:  "anonymousreact",
+						Usage: "use anonymous reactions in streaming",
+						// by default reactions are not anonymous.
+						Value: false,
+					},
+					&urfave.BoolFlag{
+						Name:  "project",
+						Usage: "if true, project functionalities are added on top of HWs",
+						// by default use project.
+						Value: true,
+					},
 					&urfave.StringFlag{
 						Name:  "storagefolder",
 						Usage: "folder that will store peer's data. If not set will use in-memory storage",
@@ -215,6 +233,9 @@ func start(c *urfave.Context) error {
 		AckTimeout:          c.Duration("acktimeout"),
 		ContinueMongering:   c.Float64("continuemongering"),
 		CrowdsProbability:   c.Float64("crowdsprobability"),
+		NoEncryption:        c.Bool("noencryption"),
+		AnonymousReact:      c.Bool("anonymousReact"),
+		Project:             c.Bool("project"),
 
 		ChunkSize: c.Uint("chunksize"),
 		BackoffDataRequest: peer.Backoff{

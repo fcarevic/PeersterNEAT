@@ -61,7 +61,7 @@ func (s *StreamInfo) getGradeForStreamUnsafe(streamID string) float64 {
 	grade := sum / float64(len(reactions))
 
 	// Update grade in list of all streams
-	log.Info().Msgf("Added reaction for stream %s: %ls", streamID, grade)
+	//log.Info().Msgf("Added reaction for stream %s: %ls", streamID, grade)
 	streamInfo, ok := s.availableStreams[streamID]
 	if !ok {
 		return 0.0
@@ -297,6 +297,7 @@ func (s *StreamInfo) addStreamClient(streamID string, clientID string) error {
 		return nil
 	}
 	streamInfo.CurrentlyWatching = uint(len(clients))
+	s.availableStreams[streamID] = streamInfo
 	return nil
 }
 
@@ -639,6 +640,9 @@ func (s *StreamInfo) unregisterAvailableStream(streamID string) {
 }
 
 func (n *node) ReactToStream(streamID string, streamerID string, grade float64) error {
+	if n.conf.AnonymousReact {
+		return n.CrowdsReact(streamID, streamerID, grade)
+	}
 
 	// Check if I am listening to a stream
 	_, err := n.streamInfo.getSymmetricKey(streamID)

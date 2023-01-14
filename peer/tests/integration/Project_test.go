@@ -14,13 +14,13 @@ import (
 func Test_Project_Integration_Test(t *testing.T) {
 	transp := channel.NewTransport()
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4),
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithProjectFunctionalities(true),
 		z.WithChunkSize(1024), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(1024),
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(1024), z.WithProjectFunctionalities(true),
 		z.WithTotalPeers(4), z.WithPaxosID(2), z.WithAntiEntropy(time.Second))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4),
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithProjectFunctionalities(true),
 		z.WithChunkSize(1024), z.WithPaxosID(3), z.WithAntiEntropy(time.Second))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4),
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithProjectFunctionalities(true),
 		z.WithChunkSize(1024), z.WithPaxosID(4), z.WithAntiEntropy(time.Second))
 
 	defer node0.Stop()
@@ -94,9 +94,15 @@ func Test_Project_Integration_Test(t *testing.T) {
 	time.Sleep(time.Second * 3)
 
 	log.Info().Msgf("initiate crowds download")
-	buf, err := node0.CrowdsDownload(trustedPeers, filename)
+	flag, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
-	require.Equal(t, data, buf)
+
+	require.Equal(t, true, flag)
+
+	require.Equal(t, 3, node0.GetStorage().GetDataBlobStore().Len())
+	require.Equal(t, []byte{'a', 'a', 'a'}, node0.GetStorage().GetDataBlobStore().Get(c1))
+	require.Equal(t, []byte{'b', 'b', 'b'}, node0.GetStorage().GetDataBlobStore().Get(c2))
+	require.Equal(t, []byte(fmt.Sprintf("%s\n%s", c1, c2)), node0.GetStorage().GetDataBlobStore().Get(mh))
 
 	// Wait for the crowds to complete
 	time.Sleep(time.Second * 3)
@@ -130,7 +136,7 @@ func Test_Project_Integration_Test(t *testing.T) {
 	require.Len(t, clients, 2)
 
 	// Stream
-	err = node0.Stream(bytes.NewBuffer(buf), filename, uint(price), streamID, []byte{}, 0)
+	err = node0.Stream(bytes.NewBuffer(data), filename, uint(price), streamID, []byte{}, 0)
 	require.NoError(t, err)
 
 	// Wait for stream to finish

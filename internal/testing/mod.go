@@ -152,6 +152,9 @@ type configTemplate struct {
 	paxosProposerRetry time.Duration
 	// PROJECT Naca
 	crowdsProbability float64
+	noEncryption      bool
+	anonymousReact    bool
+	project           bool
 }
 
 func newConfigTemplate() configTemplate {
@@ -189,6 +192,9 @@ func newConfigTemplate() configTemplate {
 
 		// PROJECT Naca
 		crowdsProbability: 0.5,
+		noEncryption:      false,
+		anonymousReact:    false,
+		project:           false,
 	}
 }
 
@@ -305,6 +311,27 @@ func WithCrowdsProbability(c float64) Option {
 	}
 }
 
+// WithNoEncryption disables encrypted Crowds and uses regular Crowds.
+func WithNoEncryption(noEncryption bool) Option {
+	return func(ct *configTemplate) {
+		ct.noEncryption = noEncryption
+	}
+}
+
+// WithAnonymousReact sets the anonymous reaction flag.
+func WithAnonymousReact(c bool) Option {
+	return func(ct *configTemplate) {
+		ct.anonymousReact = c
+	}
+}
+
+// WithProjectFunctionalities enables project functionalities.
+func WithProjectFunctionalities(c bool) Option {
+	return func(ct *configTemplate) {
+		ct.project = c
+	}
+}
+
 // NewTestNode returns a new test node.
 func NewTestNode(t require.TestingT, f peer.Factory, trans transport.Transport,
 	addr string, opts ...Option) TestNode {
@@ -334,6 +361,9 @@ func NewTestNode(t require.TestingT, f peer.Factory, trans transport.Transport,
 	config.PaxosProposerRetry = template.paxosProposerRetry
 
 	config.CrowdsProbability = template.crowdsProbability // PROJECT Naca
+	config.NoEncryption = template.noEncryption
+	config.AnonymousReact = template.anonymousReact
+	config.Project = template.project
 
 	node := f(config)
 

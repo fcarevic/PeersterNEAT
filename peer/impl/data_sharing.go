@@ -221,7 +221,7 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 	var i uint
 	for i < n.conf.BackoffDataRequest.Retry {
 		// Send msg
-		log.Info().Msgf("sending unicast for mh %s to peer %s", metahash, peerAddress)
+		//log.Info().Msgf("sending unicast for mh %s to peer %s", metahash, peerAddress)
 		errSend := n.Unicast(peerAddress, transportMessage)
 		if errSend != nil {
 			return nil, errSend
@@ -229,6 +229,9 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 
 		// Wait for timeout
 		select {
+		case <-n.notifyEnd:
+			log.Info().Msgf("node %s was stopped, getValueForMetahash stops.")
+			return nil, nil
 		case bytes := <-channel:
 			if bytes == nil {
 				return nil, xerrors.Errorf("Nil bytes received")
@@ -323,6 +326,7 @@ func (n *node) Tag(name string, mh string) error {
 			if running {
 				select {
 				case <-n.notifyEnd:
+					log.Info().Msgf("node %s was stopped, Tag stops.")
 					return nil
 
 					// This chaannel is waiting the end of previous proposer
@@ -487,6 +491,9 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (name
 
 		// Wait for the response
 		select {
+		case <-n.notifyEnd:
+			log.Info().Msgf("node %s was stopped, searchFirst stops.")
+			return "", nil
 		case filename := <-channel:
 			return filename, err
 		case <-time.After(conf.Timeout):

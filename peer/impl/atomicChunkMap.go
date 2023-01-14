@@ -8,14 +8,14 @@ import (
 
 type AtomicChunkMap struct {
 	chunkMap       map[string][][]byte
-	receivedChunks map[string]uint
+	receivedChunks map[string]int
 	mutex          sync.RWMutex
 }
 
 func NewAtomicChunkMap() *AtomicChunkMap {
 	return &AtomicChunkMap{
 		chunkMap:       make(map[string][][]byte),
-		receivedChunks: make(map[string]uint),
+		receivedChunks: make(map[string]int),
 		mutex:          sync.RWMutex{},
 	}
 }

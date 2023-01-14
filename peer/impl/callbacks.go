@@ -286,7 +286,7 @@ func (n *node) searchReplyMessageCallback(msg types.Message, pkt transport.Packe
 		// Update naming storage
 		errTag := n.Tag(fileInfo.Name, fileInfo.Metahash)
 		if errTag != nil {
-			log.Error().Msgf("[%s]: searchReplyMessageCallback: Unable to tag: %s",
+			log.Info().Msgf("[%s]: searchReplyMessageCallback: Unable to tag: %s",
 				n.conf.Socket.GetAddress(),
 				errTag.Error())
 		}

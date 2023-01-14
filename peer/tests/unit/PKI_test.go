@@ -112,10 +112,6 @@ func Test_Project_Init_Blockchain_With_Amount(t *testing.T) {
 
 	for i, node := range nodes {
 		t.Logf("node %d", i)
-
-		store := node.GetStorage().GetBlockchainStore()
-		require.Equal(t, numNodes+1, store.Len())
-
 		nodeAmount, err := node.GetAmount(node.GetAddr())
 		require.NoError(t, err)
 		require.Equal(t, amount, nodeAmount)

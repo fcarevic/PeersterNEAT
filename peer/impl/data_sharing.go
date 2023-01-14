@@ -221,7 +221,7 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 	var i uint
 	for i < n.conf.BackoffDataRequest.Retry {
 		// Send msg
-		log.Info().Msgf("sending unicast for mh %s to peer %s", metahash, peerAddress)
+		//log.Info().Msgf("sending unicast for mh %s to peer %s", metahash, peerAddress)
 		errSend := n.Unicast(peerAddress, transportMessage)
 		if errSend != nil {
 			return nil, errSend

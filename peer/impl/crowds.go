@@ -40,7 +40,7 @@ func (n *node) CrowdsSend(peers []string, body, to string) error {
 	return nil
 }
 
-func (n *node) CrowdsDownload(peers []string, filename string) ([]byte, error) {
+func (n *node) CrowdsDownload(peers []string, filename string) error {
 	if !contains(peers, n.conf.Socket.GetAddress()) {
 		peers = append(peers, n.conf.Socket.GetAddress())
 	}
@@ -58,28 +58,32 @@ func (n *node) CrowdsDownload(peers []string, filename string) ([]byte, error) {
 
 	crowdsDownloadReqMsgMarshalled, err := n.CreateCrowdsDownloadRequest(requestID, metahash)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = n.SendCrowdsMessage(&crowdsDownloadReqMsgMarshalled, peers)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	for {
 		select {
 		case <-n.notifyEnd:
-			return []byte(""), nil
+			return nil
 
 		case <-reqChannel:
 			log.Info().Msgf("node %s skinuto film", n.conf.Socket.GetAddress())
 			file := n.crowdsInfo.chunkMap.GetFile(requestID)
+			if file == nil {
+				return nil
+			}
+
 			err = os.WriteFile("./downloaded_"+filename, file, 0644)
 			if err != nil {
 				log.Error().Msgf("error while writing file to disc %s", err)
 			}
 
-			return file, nil
+			return nil
 		}
 	}
 }
@@ -228,6 +232,11 @@ func (n *node) CrowdsDownloadRequestMessageCallback(msg types.Message, _ transpo
 		return xerrors.Errorf("wrong type: %T", msg)
 	}
 
+	err := n.DownloadAndTransmit(crowdsDownloadReqMsg.Key, crowdsDownloadReqMsg)
+	if err != nil {
+		return n.TransmitChunk(nil, 0, 0, "", crowdsDownloadReqMsg)
+	}
+
 	return n.DownloadAndTransmit(crowdsDownloadReqMsg.Key, crowdsDownloadReqMsg)
 }
 
@@ -236,6 +245,13 @@ func (n *node) CrowdsDownloadReplyMessageCallback(msg types.Message, _ transport
 	crowdsDownloadReplyMsg, ok := msg.(*types.CrowdsDownloadReplyMessage)
 	if !ok {
 		return xerrors.Errorf("wrong type: %T", msg)
+	}
+
+	// If an error happened close everything.
+	if crowdsDownloadReplyMsg.Value == nil && crowdsDownloadReplyMsg.Metahash == "" &&
+		crowdsDownloadReplyMsg.Index == 0 && crowdsDownloadReplyMsg.TotalChunks == 0 {
+		n.crowdsInfo.chunkChannelMap.CloseDelete(crowdsDownloadReplyMsg.RequestID)
+		return nil
 	}
 
 	// Store locally.
@@ -296,12 +312,15 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 	for _, key := range fileParts {
 		// Get value locally or remotely
 
+		log.Info().Msgf("node %s pokusava da skine za mh %s", n.conf.Socket.GetAddress(), key)
 		chunk, errValue := n.getValueForMetahash(key)
 		if errValue != nil {
+			log.Info().Msgf("error tokom dohvatanja chunka %s", errValue)
 			return errValue
 		}
 
 		chunkIdx++
+		log.Info().Msgf("node %s ide na transmit chunks", n.conf.Socket.GetAddress())
 		err = n.TransmitChunk(chunk, chunkIdx, len(fileParts), key, msg)
 		if err != nil {
 			return err

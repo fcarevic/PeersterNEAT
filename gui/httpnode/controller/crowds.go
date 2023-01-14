@@ -90,7 +90,7 @@ func (c crowds) CrowdsDownload() http.HandlerFunc {
 			}
 
 			fmt.Println(res)
-			_, err = c.node.CrowdsDownload(res.Peers, res.Filename)
+			err = c.node.CrowdsDownload(res.Peers, res.Filename)
 			if err != nil {
 				http.Error(w, "failed to download with crowds: "+err.Error(), http.StatusInternalServerError)
 			}

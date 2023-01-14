@@ -33,7 +33,6 @@ func (n *node) CrowdsReact(streamID string, streamerID string, grade float64) er
 		StreamerID: streamerID,
 		Grade:      grade,
 	}
-
 	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(reactMsg)
 	if errMarshall != nil {
 		log.Error().Msgf(
@@ -43,30 +42,7 @@ func (n *node) CrowdsReact(streamID string, streamerID string, grade float64) er
 		return errMarshall
 	}
 
-	// Confidentiality.
-	if !n.conf.NoEncryption {
-		publicKey, err := n.GetPublicKey(streamerID)
-		if err != nil {
-			return err
-		}
-
-		confidMsg, err := n.CreateConfidentialityMsg(transportMsg, publicKey)
-		if err != nil {
-			return err
-		}
-
-		transportMsg, err = n.conf.MessageRegistry.MarshalMessage(confidMsg)
-		if err != nil {
-			return err
-		}
-	}
-
-	crowdsMessagingReqMsg := types.CrowdsMessagingRequestMessage{
-		FinalDst: streamerID,
-		Msg:      &transportMsg,
-	}
-
-	crowdsMessagingReqMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(crowdsMessagingReqMsg)
+	crowdsMessagingReqMsgMarshalled, err := n.CreateCrowdsMessagingRequest(streamerID, transportMsg)
 	if err != nil {
 		return err
 	}
@@ -110,7 +86,13 @@ func (n *node) CrowdsSend(peers []string, body, to string) error {
 		peers = append(peers, n.conf.Socket.GetAddress())
 	}
 
-	crowdsMessagingReqMsgMarshalled, err := n.CreateCrowdsMessagingRequest(to, body)
+	chatMsg := types.ChatMessage{Message: body}
+	chatMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(chatMsg)
+	if err != nil {
+		return err
+	}
+
+	crowdsMessagingReqMsgMarshalled, err := n.CreateCrowdsMessagingRequest(to, chatMsgMarshalled)
 	if err != nil {
 		return err
 	}
@@ -215,16 +197,10 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 	return n.Unicast(to, confidMsgMarshalled)
 }
 
-func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Message, error) {
-	chatMsg := types.ChatMessage{Message: content}
-	chatMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(chatMsg)
-	if err != nil {
-		return transport.Message{}, err
-	}
-
+func (n *node) CreateCrowdsMessagingRequest(dst string, message transport.Message) (transport.Message, error) {
 	crowdsMessagingReqMsg := types.CrowdsMessagingRequestMessage{
 		FinalDst: dst,
-		Msg:      &chatMsgMarshalled,
+		Msg:      &message,
 	}
 
 	if n.conf.NoEncryption {
@@ -237,7 +213,7 @@ func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Mess
 		return transport.Message{}, err
 	}
 
-	confidMsg, err := n.CreateConfidentialityMsg(chatMsgMarshalled, publicKey)
+	confidMsg, err := n.CreateConfidentialityMsg(message, publicKey)
 	if err != nil {
 		return transport.Message{}, err
 	}

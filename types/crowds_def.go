@@ -52,4 +52,7 @@ type CrowdsDownloadReplyMessage struct {
 
 	// Chunk value.
 	Value []byte
+
+	// Chunk metahash.
+	Metahash string
 }

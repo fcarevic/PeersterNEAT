@@ -152,6 +152,7 @@ type configTemplate struct {
 	paxosProposerRetry time.Duration
 	// PROJECT Naca
 	crowdsProbability float64
+	noEncryption      bool
 }
 
 func newConfigTemplate() configTemplate {
@@ -302,6 +303,13 @@ func WithPaxosProposerRetry(d time.Duration) Option {
 func WithCrowdsProbability(c float64) Option {
 	return func(ct *configTemplate) {
 		ct.crowdsProbability = c
+	}
+}
+
+// WithNoEncryption disables encrypted Crowds and uses regular Crowds.
+func WithNoEncryption(noEncryption bool) Option {
+	return func(ct *configTemplate) {
+		ct.noEncryption = noEncryption
 	}
 }
 

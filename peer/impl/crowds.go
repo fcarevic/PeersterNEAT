@@ -18,6 +18,7 @@ import (
 type CrowdsInfo struct {
 	chunkMap        *AtomicChunkMap
 	chunkChannelMap *AtomicChannelTable
+	noEncryption    bool
 }
 
 func (n *node) CrowdsSend(peers []string, body, to string) error {
@@ -100,6 +101,10 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		to = crowdsMsg.Recipients[peerIdx]
 	}
 
+	if n.crowdsInfo.noEncryption {
+		return n.Unicast(to, crowdsMsgMarshalled)
+	}
+
 	publicKey, err := n.GetPublicKey(to)
 	if err != nil {
 		return err
@@ -125,6 +130,16 @@ func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Mess
 		return transport.Message{}, err
 	}
 
+	crowdsMessagingReqMsg := types.CrowdsMessagingRequestMessage{
+		FinalDst: dst,
+		Msg:      &chatMsgMarshalled,
+	}
+
+	if !n.crowdsInfo.noEncryption {
+		return n.conf.MessageRegistry.MarshalMessage(crowdsMessagingReqMsg)
+	}
+
+	// Confidentiality.
 	publicKey, err := n.GetPublicKey(dst)
 	if err != nil {
 		return transport.Message{}, err
@@ -140,10 +155,7 @@ func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Mess
 		return transport.Message{}, err
 	}
 
-	crowdsMessagingReqMsg := types.CrowdsMessagingRequestMessage{
-		FinalDst: dst,
-		Msg:      &confidMsgMarshalled,
-	}
+	crowdsMessagingReqMsg.Msg = &confidMsgMarshalled
 
 	return n.conf.MessageRegistry.MarshalMessage(crowdsMessagingReqMsg)
 }
@@ -226,6 +238,14 @@ func (n *node) CrowdsDownloadReplyMessageCallback(msg types.Message, _ transport
 		return xerrors.Errorf("wrong type: %T", msg)
 	}
 
+	// Store locally.
+	n.conf.Storage.GetDataBlobStore().Set(crowdsDownloadReplyMsg.Metahash, crowdsDownloadReplyMsg.Value)
+
+	// If it was metafile, just store in blob and exit.
+	if crowdsDownloadReplyMsg.Index == 0 && crowdsDownloadReplyMsg.TotalChunks == 0 {
+		return nil
+	}
+
 	fileDownloaded := n.crowdsInfo.chunkMap.Add(crowdsDownloadReplyMsg)
 	if fileDownloaded {
 		n.crowdsInfo.chunkChannelMap.CloseDelete(crowdsDownloadReplyMsg.RequestID)
@@ -242,8 +262,8 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 			n.conf.Socket.GetAddress(), metahash)
 	}
 
-	_, err := n.SearchAll(*regexp.MustCompile(filename), 3, time.Second*2) // update catalog.
-	time.Sleep(time.Second * 2)
+	_, err := n.SearchAll(*regexp.MustCompile(filename), 10, time.Second*4) // update catalog.
+	time.Sleep(time.Second * 4)
 	if err != nil {
 		log.Error().Msgf("[%s] error during search all in crowds: %s",
 			n.conf.Socket.GetAddress(), err.Error())
@@ -262,11 +282,16 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 		return xerrors.Errorf("Metafile is larger than 1 chunk")
 	}
 
+	chunkIdx := uint(0)
+	err = n.TransmitChunk(metafileValueBytes, chunkIdx, 0, metahash, msg)
+	if err != nil {
+		return err
+	}
+
 	// Extract parts of the file
 	fileParts := strings.Split(string(metafileValueBytes), peer.MetafileSep)
 
 	var mapOfParts = make(map[string][]byte)
-	chunkIdx := uint(0)
 
 	for _, key := range fileParts {
 		// Get value locally or remotely
@@ -277,7 +302,7 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 		}
 
 		chunkIdx++
-		err = n.TransmitChunk(chunk, chunkIdx, len(fileParts), msg)
+		err = n.TransmitChunk(chunk, chunkIdx, len(fileParts), key, msg)
 		if err != nil {
 			return err
 		}
@@ -297,6 +322,7 @@ func (n *node) TransmitChunk(
 	chunk []byte,
 	chunkIdx uint,
 	numChunks int,
+	key string,
 	msg *types.CrowdsDownloadRequestMessage,
 ) error {
 	crowdsDownloadReplyMsg := types.CrowdsDownloadReplyMessage{
@@ -304,6 +330,7 @@ func (n *node) TransmitChunk(
 		Key:         msg.Key,
 		Index:       chunkIdx - 1,
 		Value:       chunk,
+		Metahash:    key,
 		TotalChunks: uint(numChunks),
 	}
 
@@ -312,7 +339,26 @@ func (n *node) TransmitChunk(
 		return err
 	}
 
-	return n.Unicast(msg.Origin, crowdsDownloadReplyMsgMarshalled)
+	if n.crowdsInfo.noEncryption {
+		return n.Unicast(msg.Origin, crowdsDownloadReplyMsgMarshalled)
+	}
+
+	publicKey, err := n.GetPublicKey(msg.Origin)
+	if err != nil {
+		return err
+	}
+
+	confidMsg, err := n.CreateConfidentialityMsg(crowdsDownloadReplyMsgMarshalled, publicKey)
+	if err != nil {
+		return err
+	}
+
+	confidMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(confidMsg)
+	if err != nil {
+		return err
+	}
+
+	return n.Unicast(msg.Origin, confidMsgMarshalled)
 }
 
 func (n *node) GetFileNameFromMetaHash(metahash string) string {

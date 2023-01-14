@@ -73,6 +73,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		crowdsInfo: CrowdsInfo{
 			chunkMap:        NewAtomicChunkMap(),
 			chunkChannelMap: NewAtomicChannelTable(),
+			noEncryption:    false,
 		},
 		// PROJECT Peja
 		pkiInfo: PKIInfo{

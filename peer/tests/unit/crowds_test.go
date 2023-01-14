@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	z "go.dedis.ch/cs438/internal/testing"
 	"go.dedis.ch/cs438/transport/channel"
@@ -52,21 +51,21 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 	require.Equal(t, bodyText, chatMsgs[0].Message)
 }
 
-// A wants to download file via crowds. A trusts nodes B, C to form a cluster.
+// A wants to download file via crowds. A trusts only node C to form cluster.
 // The file consists of 2 chunks and 1 metahash. Metahash and chunk1 are at B,
 // chunk2 is on node D.
 // Topology: A <-> B <-> C <-> D
 func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithTotalPeers(4), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithTotalPeers(4), z.WithPaxosID(2), z.WithAntiEntropy(time.Second))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithTotalPeers(4), z.WithPaxosID(3), z.WithAntiEntropy(time.Second))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-		z.WithTotalPeers(4), z.WithPaxosID(4), z.WithAntiEntropy(time.Second))
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(4),
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
 
 	defer node0.Stop()
 	defer node1.Stop()
@@ -91,7 +90,7 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	// only be available on node 3.
 
 	chunks := [][]byte{{'a', 'a', 'a'}, {'b', 'b', 'b'}}
-	data := append(chunks[0], chunks[1]...)
+	//data := append(chunks[0], chunks[1]...)
 
 	// sha256 of each chunk, computed by hand
 	c1 := "9834876dcfb05cb167a5c24953eba58c4ac89b1adf57f28f2f9d09af107ee8f0"
@@ -102,8 +101,6 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	log.Info().Msgf("krecem da sredjujem katalog i blob store")
-
 	storage := node1.GetStorage().GetDataBlobStore()
 	storage.Set(c1, chunks[0])
 	storage.Set(mh, []byte(fmt.Sprintf("%s\n%s", c1, c2)))
@@ -111,11 +108,10 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	storage = node3.GetStorage().GetDataBlobStore()
 	storage.Set(c2, chunks[1])
 
-	numTrustedPeers := 3
+	numTrustedPeers := 2
 	trustedPeers := make([]string, numTrustedPeers)
 	trustedPeers[0] = node0.GetAddr()
-	trustedPeers[1] = node1.GetAddr()
-	trustedPeers[2] = node3.GetAddr()
+	trustedPeers[1] = node3.GetAddr()
 
 	filename := "testFile.txt"
 	err := node2.Tag(filename, mh)
@@ -123,9 +119,31 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 
 	time.Sleep(time.Second * 3)
 
-	buf, err := node0.CrowdsDownload(trustedPeers, filename)
+	node1.UpdateCatalog(c1, node1.GetAddr())
+	node1.UpdateCatalog(c2, node3.GetAddr())
+	node1.UpdateCatalog(string(mh), node1.GetAddr())
+
+	node2.UpdateCatalog(c1, node1.GetAddr())
+	node2.UpdateCatalog(c2, node3.GetAddr())
+	node2.UpdateCatalog(string(mh), node1.GetAddr())
+
+	node3.UpdateCatalog(c1, node1.GetAddr())
+	node3.UpdateCatalog(c2, node3.GetAddr())
+	node3.UpdateCatalog(string(mh), node1.GetAddr())
+
+	node0.UpdateCatalog(c1, node1.GetAddr())
+	node0.UpdateCatalog(c2, node3.GetAddr())
+	node0.UpdateCatalog(string(mh), node1.GetAddr())
+
+	flag, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
-	require.Equal(t, data, buf)
+
+	require.Equal(t, true, flag)
+
+	require.Equal(t, 3, node0.GetStorage().GetDataBlobStore().Len())
+	require.Equal(t, []byte{'a', 'a', 'a'}, node0.GetStorage().GetDataBlobStore().Get(c1))
+	require.Equal(t, []byte{'b', 'b', 'b'}, node0.GetStorage().GetDataBlobStore().Get(c2))
+	require.Equal(t, []byte(fmt.Sprintf("%s\n%s", c1, c2)), node0.GetStorage().GetDataBlobStore().Get(mh))
 }
 
 // A wants to download file via crowds. A trusts B,D to form cluster.
@@ -133,7 +151,7 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 // Topology: A <-> B <-> C <-> D
 func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 
-	transp := udpFac() // channel.NewTransport()
+	transp := channel.NewTransport()
 
 	chunkSize := uint(8192 * 10)
 	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
@@ -182,11 +200,13 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 	trustedPeers[1] = node1.GetAddr()
 	trustedPeers[2] = node3.GetAddr()
 
-	buf, err := node0.CrowdsDownload(trustedPeers, filename)
-	time.Sleep(time.Second * 2)
+	flag, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
+	require.Equal(t, true, flag)
 
 	f, err := os.ReadFile(filename)
+	require.NoError(t, err)
+	buf, err := os.ReadFile("downloaded_" + filename)
 	require.NoError(t, err)
 	require.Equal(t, f, buf)
 }

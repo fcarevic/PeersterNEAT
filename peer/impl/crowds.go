@@ -40,7 +40,7 @@ func (n *node) CrowdsSend(peers []string, body, to string) error {
 	return nil
 }
 
-func (n *node) CrowdsDownload(peers []string, filename string) error {
+func (n *node) CrowdsDownload(peers []string, filename string) (bool, error) {
 	if !contains(peers, n.conf.Socket.GetAddress()) {
 		peers = append(peers, n.conf.Socket.GetAddress())
 	}
@@ -58,24 +58,24 @@ func (n *node) CrowdsDownload(peers []string, filename string) error {
 
 	crowdsDownloadReqMsgMarshalled, err := n.CreateCrowdsDownloadRequest(requestID, metahash)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	err = n.SendCrowdsMessage(&crowdsDownloadReqMsgMarshalled, peers)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	for {
 		select {
 		case <-n.notifyEnd:
-			return nil
+			return false, nil
 
 		case <-reqChannel:
 			log.Info().Msgf("node %s skinuto film", n.conf.Socket.GetAddress())
 			file := n.crowdsInfo.chunkMap.GetFile(requestID)
 			if file == nil {
-				return nil
+				return true, nil
 			}
 
 			err = os.WriteFile("./downloaded_"+filename, file, 0644)
@@ -83,7 +83,7 @@ func (n *node) CrowdsDownload(peers []string, filename string) error {
 				log.Error().Msgf("error while writing file to disc %s", err)
 			}
 
-			return nil
+			return true, nil
 		}
 	}
 }
@@ -249,7 +249,7 @@ func (n *node) CrowdsDownloadReplyMessageCallback(msg types.Message, _ transport
 
 	// If an error happened close everything.
 	if crowdsDownloadReplyMsg.Value == nil && crowdsDownloadReplyMsg.Metahash == "" &&
-		crowdsDownloadReplyMsg.Index == 0 && crowdsDownloadReplyMsg.TotalChunks == 0 {
+		crowdsDownloadReplyMsg.Index == -1 && crowdsDownloadReplyMsg.TotalChunks == -1 {
 		n.crowdsInfo.chunkChannelMap.CloseDelete(crowdsDownloadReplyMsg.RequestID)
 		return nil
 	}
@@ -258,7 +258,7 @@ func (n *node) CrowdsDownloadReplyMessageCallback(msg types.Message, _ transport
 	n.conf.Storage.GetDataBlobStore().Set(crowdsDownloadReplyMsg.Metahash, crowdsDownloadReplyMsg.Value)
 
 	// If it was metafile, just store in blob and exit.
-	if crowdsDownloadReplyMsg.Index == 0 && crowdsDownloadReplyMsg.TotalChunks == 0 {
+	if crowdsDownloadReplyMsg.Index == -1 && crowdsDownloadReplyMsg.TotalChunks == -1 {
 		return nil
 	}
 
@@ -278,28 +278,28 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 			n.conf.Socket.GetAddress(), metahash)
 	}
 
-	_, err := n.SearchAll(*regexp.MustCompile(filename), 10, time.Second*4) // update catalog.
-	time.Sleep(time.Second * 4)
+	_, err := n.SearchAll(*regexp.MustCompile(filename), 10, time.Second*3) // update catalog.
 	if err != nil {
-		log.Error().Msgf("[%s] error during search all in crowds: %s",
+		log.Info().Msgf("[%s] error during search all in crowds: %s",
 			n.conf.Socket.GetAddress(), err.Error())
 		return err
 	}
-	log.Info().Msgf("node %s catalog is %s", n.conf.Socket.GetAddress(), n.GetCatalog())
 
 	// Get metafile
 	metafileValueBytes, err := n.getValueForMetahash(metahash)
 	if err != nil {
-		log.Error().Msgf("could not get name for metahash %s, error: %s", metahash, err.Error())
+		log.Info().Msgf("could not get name for metahash %s, error: %s", metahash, err.Error())
 		return err
 	}
 
 	if uint(len(metafileValueBytes)) > n.conf.ChunkSize {
+		log.Info().Msgf("metafile is larger than 1 chunk during crowds download")
 		return xerrors.Errorf("Metafile is larger than 1 chunk")
 	}
 
-	chunkIdx := uint(0)
-	err = n.TransmitChunk(metafileValueBytes, chunkIdx, 0, metahash, msg)
+	chunkIdx := 0
+
+	err = n.TransmitChunk(metafileValueBytes, chunkIdx, -1, metahash, msg)
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,7 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 	for _, key := range fileParts {
 		// Get value locally or remotely
 
-		log.Info().Msgf("node %s pokusava da skine za mh %s", n.conf.Socket.GetAddress(), key)
+		//log.Info().Msgf("node %s trying download for mh %s", n.conf.Socket.GetAddress(), key)
 		chunk, errValue := n.getValueForMetahash(key)
 		if errValue != nil {
 			log.Info().Msgf("error tokom dohvatanja chunka %s", errValue)
@@ -320,7 +320,7 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 		}
 
 		chunkIdx++
-		log.Info().Msgf("node %s ide na transmit chunks", n.conf.Socket.GetAddress())
+		//log.Info().Msgf("node %s transmit chunks", n.conf.Socket.GetAddress())
 		err = n.TransmitChunk(chunk, chunkIdx, len(fileParts), key, msg)
 		if err != nil {
 			return err
@@ -339,7 +339,7 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 
 func (n *node) TransmitChunk(
 	chunk []byte,
-	chunkIdx uint,
+	chunkIdx int,
 	numChunks int,
 	key string,
 	msg *types.CrowdsDownloadRequestMessage,
@@ -350,7 +350,7 @@ func (n *node) TransmitChunk(
 		Index:       chunkIdx - 1,
 		Value:       chunk,
 		Metahash:    key,
-		TotalChunks: uint(numChunks),
+		TotalChunks: numChunks,
 	}
 
 	crowdsDownloadReplyMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(crowdsDownloadReplyMsg)

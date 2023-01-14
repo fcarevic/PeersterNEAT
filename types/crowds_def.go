@@ -45,10 +45,10 @@ type CrowdsDownloadReplyMessage struct {
 	Key string
 
 	// Index of chunk.
-	Index uint
+	Index int
 
 	// TotalChunks is total num of chunks.
-	TotalChunks uint
+	TotalChunks int
 
 	// Chunk value.
 	Value []byte

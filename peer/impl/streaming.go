@@ -640,6 +640,9 @@ func (s *StreamInfo) unregisterAvailableStream(streamID string) {
 }
 
 func (n *node) ReactToStream(streamID string, streamerID string, grade float64) error {
+	if n.conf.AnonymousReact {
+		return n.CrowdsReact(streamID, streamerID, grade)
+	}
 
 	// Check if I am listening to a stream
 	_, err := n.streamInfo.getSymmetricKey(streamID)

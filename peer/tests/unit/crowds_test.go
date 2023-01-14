@@ -2,7 +2,9 @@ package unit
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"os"
 	"testing"
 	"time"
@@ -209,4 +211,132 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 	buf, err := os.ReadFile("downloaded_" + filename)
 	require.NoError(t, err)
 	require.Equal(t, f, buf)
+}
+
+func Test_Crowds_Rating_MultipleClients(t *testing.T) {
+	transp := channel.NewTransport()
+	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
+
+	node1 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2),
+		z.WithAntiEntropy(time.Second),
+		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+	)
+	node2 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2),
+		z.WithAntiEntropy(time.Second),
+		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+	)
+	node3 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(2),
+		z.WithAntiEntropy(time.Second),
+		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+	)
+	node4 := z.NewTestNode(
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4),
+		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second),
+		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+	)
+	defer node1.Stop()
+	defer node2.Stop()
+	defer node3.Stop()
+	defer node4.Stop()
+
+	node1.AddPeer(node2.GetAddr())
+	// node 1 see nodes 3 and 4 via node 2
+	node1.SetRoutingEntry(node3.GetAddr(), node2.GetAddr())
+	node1.SetRoutingEntry(node4.GetAddr(), node2.GetAddr())
+	node2.AddPeer(node1.GetAddr())
+	node2.AddPeer(node3.GetAddr())
+	node3.AddPeer(node2.GetAddr())
+	node2.AddPeer(node4.GetAddr())
+	node4.AddPeer(node2.GetAddr())
+	// nodes 3 and 4 see nodes see node 1 via node 2
+	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
+	node4.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
+
+	node1.Start()
+	node2.Start()
+	node3.Start()
+	node4.Start()
+
+	time.Sleep(time.Second * 2)
+
+	chunk1 := make([]byte, chunkSize)
+	chunk2 := make([]byte, chunkSize)
+	chunk3 := make([]byte, chunkSize/3)
+	chunks := [][]byte{chunk1, chunk2, chunk3}
+	chunk1[0] = 0xa
+	chunk2[0] = 0xb
+	chunk3[0] = 0xc
+
+	data := append(chunk1, append(chunk2, chunk3...)...)
+
+	fileName := "file"
+	price := 10
+
+	buf := bytes.NewBuffer(data)
+
+	streamID, err := node1.AnnounceStartStreaming(fileName, uint(price), []byte{})
+	require.NoError(t, err)
+
+	// Wait for announcement to finish
+	time.Sleep(time.Second)
+	err = node3.ConnectToStream(streamID, node1.GetAddr())
+	require.NoError(t, err)
+
+	err = node4.ConnectToStream(streamID, node1.GetAddr())
+	require.NoError(t, err)
+
+	// Wait for joining to finish
+	time.Sleep(time.Second)
+
+	err = node3.ReactToStream(streamID, node1.GetAddr(), 5.0)
+	require.NoError(t, err)
+	err = node4.ReactToStream(streamID, node1.GetAddr(), 4.0)
+	require.NoError(t, err)
+	time.Sleep(time.Second)
+	clients, err := node1.GetClients(streamID)
+	require.NoError(t, err)
+	require.Len(t, clients, 2)
+
+	// Stream
+	err = node1.Stream(buf, fileName, uint(price), streamID, []byte{}, 0)
+	require.NoError(t, err)
+
+	// Wait for stream to finish
+	time.Sleep(time.Second)
+
+	// Node 2 should not have any stream messages
+	_, errNode2 := node2.GetNextChunks(streamID, len(chunks))
+	require.Error(t, errNode2)
+
+	// Node 3 should have received chunks
+	streamMsgs, errC := node3.GetNextChunks(streamID, len(chunks))
+	require.NoError(t, errC)
+
+	for ind, msg := range streamMsgs {
+		require.Equal(t, msg.StreamInfo.Name, fileName)
+		require.Equal(t, msg.StreamInfo.Price, uint(price))
+		require.Equal(t, msg.StreamInfo.CurrentlyWatching, uint(2))
+		require.Greater(t, msg.StreamInfo.Grade, 4.4)
+		require.Less(t, msg.StreamInfo.Grade, 4.6)
+		require.Equal(t, msg.Data.Chunk, chunks[ind])
+	}
+
+	// Node 4 should have received chunks
+	streamMsgs, errC = node4.GetNextChunks(streamID, len(chunks))
+	require.NoError(t, errC)
+
+	for ind, msg := range streamMsgs {
+		require.Equal(t, msg.StreamInfo.Name, fileName)
+		require.Equal(t, msg.StreamInfo.Price, uint(price))
+		require.Equal(t, msg.StreamInfo.CurrentlyWatching, uint(2))
+		require.Greater(t, msg.StreamInfo.Grade, 4.4)
+		require.Less(t, msg.StreamInfo.Grade, 4.6)
+		require.Equal(t, msg.Data.Chunk, chunks[ind])
+	}
+
+	log.Info().Msgf("Test Done")
+
 }

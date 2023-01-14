@@ -18,7 +18,91 @@ import (
 type CrowdsInfo struct {
 	chunkMap        *AtomicChunkMap
 	chunkChannelMap *AtomicChannelTable
-	noEncryption    bool
+}
+
+func (n *node) CrowdsReact(streamID string, streamerID string, grade float64) error {
+	// Check if I am listening to a stream
+	_, err := n.streamInfo.getSymmetricKey(streamID)
+	if err != nil {
+		log.Error().Msgf("[%s] React to stream error: %s", n.conf.Socket.GetAddress(), err.Error())
+		return err
+	}
+
+	reactMsg := types.StreamRatingMessage{
+		StreamID:   streamID,
+		StreamerID: streamerID,
+		Grade:      grade,
+	}
+
+	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(reactMsg)
+	if errMarshall != nil {
+		log.Error().Msgf(
+			"[%s]:ReactToStream: Error marshalling: %s",
+			n.conf.Socket.GetAddress(), errMarshall.Error(),
+		)
+		return errMarshall
+	}
+
+	// Confidentiality.
+	if !n.conf.NoEncryption {
+		publicKey, err := n.GetPublicKey(streamerID)
+		if err != nil {
+			return err
+		}
+
+		confidMsg, err := n.CreateConfidentialityMsg(transportMsg, publicKey)
+		if err != nil {
+			return err
+		}
+
+		transportMsg, err = n.conf.MessageRegistry.MarshalMessage(confidMsg)
+		if err != nil {
+			return err
+		}
+	}
+
+	crowdsMessagingReqMsg := types.CrowdsMessagingRequestMessage{
+		FinalDst: streamerID,
+		Msg:      &transportMsg,
+	}
+
+	crowdsMessagingReqMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(crowdsMessagingReqMsg)
+	if err != nil {
+		return err
+	}
+
+	// Get all peers.
+	routingTable := n.GetRoutingTable()
+	delete(routingTable, n.conf.Socket.GetAddress())
+	peers := make([]string, len(routingTable))
+	i := 0
+	for peer := range routingTable {
+		peers[i] = peer
+		i++
+	}
+
+	// Shuffle peers.
+	peersShuffled := make([]string, len(peers))
+	perm := rand.Perm(len(peers))
+	for i, v := range perm {
+		peersShuffled[v] = peers[i]
+	}
+
+	// Choose at least one random peer and add myself.
+	randsize := rand.Intn(len(peersShuffled)-1) + 1
+	recipients := peersShuffled[:randsize]
+	if !contains(recipients, n.conf.Socket.GetAddress()) {
+		recipients = append(recipients, n.conf.Socket.GetAddress())
+	}
+
+	log.Info().Msgf("node %s chose random peers for crowds react: %s", recipients)
+
+	err = n.SendCrowdsMessage(&crowdsMessagingReqMsgMarshalled, recipients)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (n *node) CrowdsSend(peers []string, body, to string) error {
@@ -89,6 +173,10 @@ func (n *node) CrowdsDownload(peers []string, filename string) (bool, error) {
 }
 
 func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []string) error {
+	if !contains(recipients, n.conf.Socket.GetAddress()) {
+		recipients = append(recipients, n.conf.Socket.GetAddress())
+	}
+
 	crowdsMsg := types.CrowdsMessage{
 		Msg:        embeddedMsg,
 		Recipients: recipients,
@@ -105,7 +193,7 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		to = crowdsMsg.Recipients[peerIdx]
 	}
 
-	if n.crowdsInfo.noEncryption {
+	if n.conf.NoEncryption {
 		return n.Unicast(to, crowdsMsgMarshalled)
 	}
 
@@ -139,7 +227,7 @@ func (n *node) CreateCrowdsMessagingRequest(dst, content string) (transport.Mess
 		Msg:      &chatMsgMarshalled,
 	}
 
-	if !n.crowdsInfo.noEncryption {
+	if n.conf.NoEncryption {
 		return n.conf.MessageRegistry.MarshalMessage(crowdsMessagingReqMsg)
 	}
 
@@ -278,7 +366,7 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 			n.conf.Socket.GetAddress(), metahash)
 	}
 
-	_, err := n.SearchAll(*regexp.MustCompile(filename), 10, time.Second*3) // update catalog.
+	_, err := n.SearchAll(*regexp.MustCompile(filename), 5, time.Second*3) // update catalog.
 	if err != nil {
 		log.Info().Msgf("[%s] error during search all in crowds: %s",
 			n.conf.Socket.GetAddress(), err.Error())
@@ -358,7 +446,7 @@ func (n *node) TransmitChunk(
 		return err
 	}
 
-	if n.crowdsInfo.noEncryption {
+	if n.conf.NoEncryption {
 		return n.Unicast(msg.Origin, crowdsDownloadReplyMsgMarshalled)
 	}
 

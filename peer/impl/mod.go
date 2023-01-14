@@ -84,23 +84,24 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	// Add self-address to routing table
 	n.routingTable[n.conf.Socket.GetAddress()] = n.conf.Socket.GetAddress()
 
-	n.CrowdsInit(conf) // PROJECT Naca
-
-	// PROJECT Peja
-	if n.conf.AntiEntropyInterval != 0 {
-		publicKey, privateKey, err := n.PkiInit(n.conf.Socket.GetAddress(), 100)
-		if err != nil {
-			log.Error().Msgf("pkiInit error", err)
-			return nil
+	if n.conf.Project {
+		// PROJECT Peja
+		if n.conf.AntiEntropyInterval != 0 {
+			publicKey, privateKey, err := n.PkiInit(n.conf.Socket.GetAddress(), 100)
+			if err != nil {
+				log.Error().Msgf("pkiInit error", err)
+				return nil
+			}
+			n.pkiInfo = PKIInfo{privateKey, publicKey}
+		} else {
+			n.conf.MessageRegistry.RegisterMessageCallback(types.ConfidentialityMessage{}, n.ProcessConfidentialityMessage)
 		}
-		n.pkiInfo = PKIInfo{privateKey, publicKey}
-	} else {
-		n.conf.MessageRegistry.RegisterMessageCallback(types.ConfidentialityMessage{}, n.ProcessConfidentialityMessage)
-	}
 
-	// Project
-	n.MulticastInit()
-	n.StreamingInit()
+		// Project
+		n.CrowdsInit(conf)
+		n.MulticastInit()
+		n.StreamingInit()
+	}
 
 	// Register callbacks
 	n.conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, n.chatMessageCallback)

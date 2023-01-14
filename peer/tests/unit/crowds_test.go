@@ -24,7 +24,7 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 
 	for i := range nodes {
 		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-			z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second))
+			z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true))
 		defer node.Stop()
 		nodes[i] = node
 	}
@@ -61,13 +61,13 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
 	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
 	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(2),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
 	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(3),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
 	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(4),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1))
+		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
 
 	defer node0.Stop()
 	defer node1.Stop()
@@ -156,13 +156,13 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 	transp := channel.NewTransport()
 
 	chunkSize := uint(8192 * 10)
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
 	defer node0.Stop()
 	defer node1.Stop()
@@ -219,22 +219,22 @@ func Test_Crowds_Rating_MultipleClients(t *testing.T) {
 
 	node1 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
 	node2 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
 	node3 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
 	node4 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4),
-		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second),
+		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
 	defer node1.Stop()

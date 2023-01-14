@@ -46,6 +46,7 @@ func Test_Project_PKI_Init_Blockchain_With_Amount(t *testing.T) {
 			transp,
 			"127.0.0.1:0",
 			z.WithTotalPeers(uint(numNodes)),
+			z.WithProjectFunctionalities(true),
 			z.WithPaxosID(uint(i+1)),
 			z.WithAntiEntropy(time.Second),
 		)
@@ -88,6 +89,7 @@ func Test_Project_Init_Blockchain_With_Amount(t *testing.T) {
 			peerFac,
 			transp,
 			"127.0.0.1:0",
+			z.WithProjectFunctionalities(true),
 			z.WithTotalPeers(uint(numNodes)),
 			z.WithPaxosID(uint(i+1)),
 		)
@@ -137,6 +139,7 @@ func Test_Project_Subscription_Enough_Money(t *testing.T) {
 			peerFac,
 			transp,
 			"127.0.0.1:0",
+			z.WithProjectFunctionalities(true),
 			z.WithTotalPeers(uint(numNodes)),
 			z.WithPaxosID(uint(i+1)),
 		)
@@ -209,6 +212,7 @@ func Test_Project_Subscription_Not_Enough_Money(t *testing.T) {
 			peerFac,
 			transp,
 			"127.0.0.1:0",
+			z.WithProjectFunctionalities(true),
 			z.WithTotalPeers(uint(numNodes)),
 			z.WithPaxosID(uint(i+1)),
 		)
@@ -276,6 +280,7 @@ func Test_Project_Subscription_Check(t *testing.T) {
 			peerFac,
 			transp,
 			"127.0.0.1:0",
+			z.WithProjectFunctionalities(true),
 			z.WithTotalPeers(uint(numNodes)),
 			z.WithPaxosID(uint(i+1)),
 		)
@@ -345,6 +350,7 @@ func Test_Project_Message_Encryption_Decryption(t *testing.T) {
 			peerFac,
 			transp,
 			"127.0.0.1:0",
+			z.WithProjectFunctionalities(true),
 			z.WithTotalPeers(uint(numNodes)),
 			z.WithPaxosID(uint(i+1)),
 		)

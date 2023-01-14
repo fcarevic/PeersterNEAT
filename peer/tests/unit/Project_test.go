@@ -39,9 +39,9 @@ func Test_Project_Stream_No_Clients(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithAutostart(false))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithAutostart(false))
 	defer node1.Stop()
 	defer node2.Stop()
@@ -121,9 +121,9 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
 
 	defer node1.Stop()
@@ -317,9 +317,9 @@ func Test_Project_SimpleStream(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
 		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
 	defer node1.Stop()
 	defer node2.Stop()
@@ -521,9 +521,9 @@ func Test_Project_SimpleStream(t *testing.T) {
 //	transp := udp.NewUDP()
 //	chunkSize := uint(12 * 1024) // The metafile can handle just 3 chunks
 //
-//	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+//	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",z.WithProjectFunctionalities(true),
 //	z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
-//	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+//	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",z.WithProjectFunctionalities(true),
 //	z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
 //	defer node1.Stop()
 //	defer node2.Stop()
@@ -589,17 +589,17 @@ func Test_Project_RelayedStream(t *testing.T) {
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(0), z.WithAutostart(false), z.WithPaxosID(1), z.WithTotalPeers(2),
 		z.WithAntiEntropy(time.Second),
 	)
 	node2 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(0), z.WithAutostart(false), z.WithPaxosID(2), z.WithTotalPeers(2),
 		z.WithAntiEntropy(time.Second),
 	)
 	node3 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(0), z.WithAutostart(false), z.WithPaxosID(3), z.WithTotalPeers(2),
 		z.WithAntiEntropy(time.Second),
 	)
@@ -817,22 +817,22 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 
 	node1 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node2 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node3 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node4 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4),
-		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second),
+		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	defer node1.Stop()
@@ -937,22 +937,22 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 
 	node1 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node2 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node3 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node4 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4),
-		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second),
+		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	defer node1.Stop()
@@ -1072,7 +1072,7 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 //	var nodes []z.TestNode
 //
 //	for i := 0; i < numNodes; i++ {
-//		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),
+//		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),z.WithProjectFunctionalities(true),
 //		z.WithPaxosID(uint(i+1)), z.WithTotalPeers(uint(numNodes)), z.WithAntiEntropy(200*time.Millisecond))
 //		defer node.Stop()
 //		nodes = append(nodes, node)

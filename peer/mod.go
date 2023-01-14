@@ -93,6 +93,7 @@ type Configuration struct {
 	CrowdsProbability float64
 	NoEncryption      bool
 	AnonymousReact    bool
+	Project           bool
 }
 
 // Backoff describes parameters for a backoff algorithm. The initial time must

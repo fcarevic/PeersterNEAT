@@ -154,6 +154,7 @@ type configTemplate struct {
 	crowdsProbability float64
 	noEncryption      bool
 	anonymousReact    bool
+	project           bool
 }
 
 func newConfigTemplate() configTemplate {
@@ -193,6 +194,7 @@ func newConfigTemplate() configTemplate {
 		crowdsProbability: 0.5,
 		noEncryption:      false,
 		anonymousReact:    false,
+		project:           false,
 	}
 }
 
@@ -323,6 +325,13 @@ func WithAnonymousReact(c bool) Option {
 	}
 }
 
+// WithProjectFunctionalities enables project functionalities.
+func WithProjectFunctionalities(c bool) Option {
+	return func(ct *configTemplate) {
+		ct.project = c
+	}
+}
+
 // NewTestNode returns a new test node.
 func NewTestNode(t require.TestingT, f peer.Factory, trans transport.Transport,
 	addr string, opts ...Option) TestNode {
@@ -354,6 +363,7 @@ func NewTestNode(t require.TestingT, f peer.Factory, trans transport.Transport,
 	config.CrowdsProbability = template.crowdsProbability // PROJECT Naca
 	config.NoEncryption = template.noEncryption
 	config.AnonymousReact = template.anonymousReact
+	config.Project = template.project
 
 	node := f(config)
 

@@ -203,7 +203,8 @@ func (m messaging) routingPost(w http.ResponseWriter, r *http.Request) {
 
 	m.log.Info().Msgf("got the following message: %v", res)
 
-	m.node.SetRoutingEntry(res.Origin, res.RelayAddr)
+	//m.node.SetRoutingEntry(res.Origin, res.RelayAddr)
+	m.node.AddPeer(res.Origin)
 }
 
 // "Msg" can be of any type, based on "Type". Here a chat message.

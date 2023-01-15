@@ -33,6 +33,7 @@ func (n *node) CrowdsReact(streamID string, streamerID string, grade float64) er
 		StreamerID: streamerID,
 		Grade:      grade,
 	}
+
 	transportMsg, errMarshall := n.conf.MessageRegistry.MarshalMessage(reactMsg)
 	if errMarshall != nil {
 		log.Error().Msgf(
@@ -47,28 +48,9 @@ func (n *node) CrowdsReact(streamID string, streamerID string, grade float64) er
 		return err
 	}
 
-	// Get all peers.
-	routingTable := n.GetRoutingTable()
-	delete(routingTable, n.conf.Socket.GetAddress())
-	peers := make([]string, len(routingTable))
-	i := 0
-	for peer := range routingTable {
-		peers[i] = peer
-		i++
-	}
-
-	// Shuffle peers.
-	peersShuffled := make([]string, len(peers))
-	perm := rand.Perm(len(peers))
-	for i, v := range perm {
-		peersShuffled[v] = peers[i]
-	}
-
-	// Choose at least one random peer and add myself.
-	randsize := rand.Intn(len(peersShuffled)-1) + 1
-	recipients := peersShuffled[:randsize]
-	if !contains(recipients, n.conf.Socket.GetAddress()) {
-		recipients = append(recipients, n.conf.Socket.GetAddress())
+	recipients := n.GenerateCrowd()
+	if recipients == nil {
+		return xerrors.Errorf("node %s chose no peers for crowds, aborting", n.conf.Socket.GetAddress())
 	}
 
 	log.Info().Msgf("node %s chose random peers for crowds react: %s", n.conf.Socket.GetAddress(), recipients)
@@ -86,7 +68,10 @@ func (n *node) CrowdsSend(peers []string, body, to string) error {
 		peers = append(peers, n.conf.Socket.GetAddress())
 	}
 
-	chatMsg := types.ChatMessage{Message: body}
+	chatMsg := types.ChatMessage{
+		Message: body,
+	}
+
 	chatMsgMarshalled, err := n.conf.MessageRegistry.MarshalMessage(chatMsg)
 	if err != nil {
 		return err
@@ -101,6 +86,7 @@ func (n *node) CrowdsSend(peers []string, body, to string) error {
 	if err != nil {
 		return err
 	}
+
 	n.chatInfo.AddMessage(body, to)
 
 	return nil
@@ -111,7 +97,9 @@ func (n *node) CrowdsDownload(peers []string, filename string) (bool, error) {
 		peers = append(peers, n.conf.Socket.GetAddress())
 	}
 
+	// Unique ID for each download request.
 	requestID := xid.New().String()
+
 	reqChannel := make(chan string)
 	n.crowdsInfo.chunkChannelMap.StoreChannel(requestID, reqChannel)
 
@@ -135,12 +123,14 @@ func (n *node) CrowdsDownload(peers []string, filename string) (bool, error) {
 	}
 
 	for {
+
 		select {
 		case <-n.notifyEnd:
 			return false, nil
 
 		case <-reqChannel:
-			log.Info().Msgf("node %s skinuto film", n.conf.Socket.GetAddress())
+			log.Info().Msgf("node %s downloaded film", n.conf.Socket.GetAddress())
+
 			file := n.crowdsInfo.chunkMap.GetFile(requestID)
 			if file == nil {
 				return true, nil
@@ -153,6 +143,7 @@ func (n *node) CrowdsDownload(peers []string, filename string) (bool, error) {
 
 			return true, nil
 		}
+
 	}
 }
 
@@ -171,6 +162,7 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 		return err
 	}
 
+	// Choose random node from recipients, but do not forward to myself again.
 	to := n.conf.Socket.GetAddress()
 	for to == n.conf.Socket.GetAddress() {
 		peerIdx := rand.Intn(len(crowdsMsg.Recipients))
@@ -197,6 +189,45 @@ func (n *node) SendCrowdsMessage(embeddedMsg *transport.Message, recipients []st
 	}
 
 	return n.Unicast(to, confidMsgMarshalled)
+}
+
+func (n *node) GenerateCrowd() []string {
+	// Get routing table.
+	routingTable := n.GetRoutingTable()
+	delete(routingTable, n.conf.Socket.GetAddress()) // Delete myself.
+
+	if len(routingTable) == 0 {
+		log.Info().Msgf("node %s has no peers to participate in crowds.")
+		return []string{n.conf.Socket.GetAddress()}
+	}
+
+	// Extract peers.
+	peers := make([]string, len(routingTable))
+	idx := 0
+	for p := range routingTable {
+		peers[idx] = p
+		idx++
+	}
+
+	// Shuffle peers.
+	peersShuffled := make([]string, len(peers))
+	perm := rand.Perm(len(peers))
+	for i, v := range perm {
+		peersShuffled[v] = peers[i]
+	}
+
+	// Choose at least one random peer.
+	randsize := rand.Intn(len(peersShuffled)-1) + 1
+	recipients := peersShuffled[:randsize]
+
+	// Add myself.
+	if !contains(recipients, n.conf.Socket.GetAddress()) {
+		recipients = append(recipients, n.conf.Socket.GetAddress())
+	}
+
+	log.Info().Msgf("node %s chose random peers for crowds react: %s", n.conf.Socket.GetAddress(), recipients)
+
+	return recipients
 }
 
 func (n *node) CreateCrowdsMessagingRequest(dst string, message transport.Message) (transport.Message, error) {
@@ -242,7 +273,11 @@ func (n *node) CreateCrowdsDownloadRequest(reqID, content string) (transport.Mes
 
 func (n *node) CrowdsInit(conf peer.Configuration) {
 	log.Info().Msgf("Registering crowds-callbacks for node %s", conf.Socket.GetAddress())
-	conf.MessageRegistry.RegisterMessageCallback(types.CrowdsMessage{}, n.CrowdsMessageCallback)
+
+	conf.MessageRegistry.RegisterMessageCallback(
+		types.CrowdsMessage{},
+		n.CrowdsMessageCallback,
+	)
 	conf.MessageRegistry.RegisterMessageCallback(
 		types.CrowdsMessagingRequestMessage{},
 		n.CrowdsMessagingRequestMessageCallback,
@@ -277,7 +312,7 @@ func (n *node) CrowdsMessageCallback(msg types.Message, pkt transport.Packet) er
 		return n.conf.MessageRegistry.ProcessPacket(transport.Packet{Header: pkt.Header, Msg: crowdsMsg.Msg})
 	}
 
-	// If rand > keep crowds msging
+	// If rand > keep crowds messaging
 	return n.SendCrowdsMessage(crowdsMsg.Msg, crowdsMsg.Recipients)
 }
 
@@ -300,6 +335,7 @@ func (n *node) CrowdsDownloadRequestMessageCallback(msg types.Message, _ transpo
 
 	err := n.DownloadAndTransmit(crowdsDownloadReqMsg.Key, crowdsDownloadReqMsg)
 	if err != nil {
+		// Notify about error.
 		return n.TransmitChunk(nil, 0, 0, "", crowdsDownloadReqMsg)
 	}
 
@@ -390,6 +426,7 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 		}
 
 		chunkIdx++
+
 		//log.Info().Msgf("node %s transmit chunks", n.conf.Socket.GetAddress())
 		err = n.TransmitChunk(chunk, chunkIdx, len(fileParts), key, msg)
 		if err != nil {

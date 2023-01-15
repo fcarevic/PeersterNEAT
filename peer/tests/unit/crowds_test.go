@@ -24,10 +24,14 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 
 	for i := range nodes {
 		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
-			z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true))
+			z.WithTotalPeers(uint(numNodes)), z.WithPaxosID(uint(i+1)),
+			z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+			z.WithProjectFunctionalities(true))
 		defer node.Stop()
+
 		nodes[i] = node
 	}
+
 	for _, n1 := range nodes {
 		for _, n2 := range nodes {
 			n1.AddPeer(n2.GetAddr())
@@ -51,6 +55,8 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 
 	chatMsgs := finalNode.GetChatMsgs()
 	require.Equal(t, bodyText, chatMsgs[0].Message)
+
+	log.Info().Msgf("Test Done")
 }
 
 // A wants to download file via crowds. A trusts only node C to form cluster.
@@ -60,14 +66,26 @@ func Test_Crowds_Messaging_Request(t *testing.T) {
 func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 	transp := channel.NewTransport()
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(1),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(2),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(3),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithPaxosID(4),
-		z.WithAntiEntropy(time.Second), z.WithContinueMongering(0.1), z.WithProjectFunctionalities(true))
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true),
+		z.WithPaxosID(1), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true),
+		z.WithPaxosID(2), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true),
+		z.WithPaxosID(3), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true),
+		z.WithPaxosID(4), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
 
 	defer node0.Stop()
 	defer node1.Stop()
@@ -142,10 +160,13 @@ func Test_Crowds_Crowds_Download_Remote_And_Local_With_relay(t *testing.T) {
 
 	require.Equal(t, true, flag)
 
+	// Compare BlobStore to original chunks/mh.
 	require.Equal(t, 3, node0.GetStorage().GetDataBlobStore().Len())
 	require.Equal(t, []byte{'a', 'a', 'a'}, node0.GetStorage().GetDataBlobStore().Get(c1))
 	require.Equal(t, []byte{'b', 'b', 'b'}, node0.GetStorage().GetDataBlobStore().Get(c2))
 	require.Equal(t, []byte(fmt.Sprintf("%s\n%s", c1, c2)), node0.GetStorage().GetDataBlobStore().Get(mh))
+
+	log.Info().Msgf("Test Done")
 }
 
 // A wants to download file via crowds. A trusts B,D to form cluster.
@@ -156,14 +177,28 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 	transp := channel.NewTransport()
 
 	chunkSize := uint(8192 * 10)
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(4), z.WithTotalPeers(4), z.WithAntiEntropy(time.Millisecond*500))
+
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true), z.WithChunkSize(chunkSize),
+		z.WithPaxosID(1), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true), z.WithChunkSize(chunkSize),
+		z.WithPaxosID(2), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true), z.WithChunkSize(chunkSize),
+		z.WithPaxosID(3), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",
+		z.WithProjectFunctionalities(true), z.WithChunkSize(chunkSize),
+		z.WithPaxosID(4), z.WithTotalPeers(4),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+	)
+
 	defer node0.Stop()
 	defer node1.Stop()
 	defer node2.Stop()
@@ -188,9 +223,12 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 	filename := "proba.mp4"
 	file, err := os.Open(filename)
 	require.NoError(t, err)
+
+	// Uploda the file.
 	mh, err := node2.Upload(bufio.NewReader(file))
 	require.NoError(t, err)
 
+	// Tag the file.
 	err = node2.Tag(filename, mh)
 	require.NoError(t, err)
 
@@ -202,55 +240,67 @@ func Test_Crowds_Download_File_With_Upload(t *testing.T) {
 	trustedPeers[1] = node1.GetAddr()
 	trustedPeers[2] = node3.GetAddr()
 
+	// Download with Crowds.
 	flag, err := node0.CrowdsDownload(trustedPeers, filename)
 	require.NoError(t, err)
 	require.Equal(t, true, flag)
 
+	// Compare if its the same file.
 	f, err := os.ReadFile(filename)
 	require.NoError(t, err)
+
 	buf, err := os.ReadFile("downloaded_" + filename)
 	require.NoError(t, err)
 	require.Equal(t, f, buf)
+
+	log.Info().Msgf("Test Done")
 }
 
 func Test_Crowds_Rating_MultipleClients(t *testing.T) {
 	transp := channel.NewTransport()
+
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
+		z.WithPaxosID(1), z.WithTotalPeers(2), z.WithChunkSize(chunkSize),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+		z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
 	node2 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
+		z.WithPaxosID(2), z.WithTotalPeers(2), z.WithChunkSize(chunkSize),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+		z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
 	node3 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
+		z.WithPaxosID(3), z.WithTotalPeers(2), z.WithChunkSize(chunkSize),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+		z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
 	node4 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4),
-		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(1), z.WithAutostart(false), z.WithAnonymousReact(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
+		z.WithPaxosID(4), z.WithTotalPeers(2), z.WithChunkSize(chunkSize),
+		z.WithAntiEntropy(time.Millisecond*20), z.WithContinueMongering(1),
+		z.WithAutostart(false), z.WithAnonymousReact(true),
 	)
+
 	defer node1.Stop()
 	defer node2.Stop()
 	defer node3.Stop()
 	defer node4.Stop()
 
 	node1.AddPeer(node2.GetAddr())
-	// node 1 see nodes 3 and 4 via node 2
-	node1.SetRoutingEntry(node3.GetAddr(), node2.GetAddr())
-	node1.SetRoutingEntry(node4.GetAddr(), node2.GetAddr())
 	node2.AddPeer(node1.GetAddr())
 	node2.AddPeer(node3.GetAddr())
 	node3.AddPeer(node2.GetAddr())
 	node2.AddPeer(node4.GetAddr())
 	node4.AddPeer(node2.GetAddr())
+
+	// node 1 see nodes 3 and 4 via node 2
+	node1.SetRoutingEntry(node3.GetAddr(), node2.GetAddr())
+	node1.SetRoutingEntry(node4.GetAddr(), node2.GetAddr())
 	// nodes 3 and 4 see nodes see node 1 via node 2
 	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
 	node4.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
@@ -295,7 +345,9 @@ func Test_Crowds_Rating_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 	err = node4.ReactToStream(streamID, node1.GetAddr(), 4.0)
 	require.NoError(t, err)
+
 	time.Sleep(time.Second)
+
 	clients, err := node1.GetClients(streamID)
 	require.NoError(t, err)
 	require.Len(t, clients, 2)

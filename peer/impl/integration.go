@@ -81,7 +81,7 @@ func (n *node) StreamFFMPG4(
 		}
 		//time.Sleep(time.Second)
 
-		log.Error().Msgf("%d", n)
+		log.Error().Msgf("%d", lines)
 	}
 }
 

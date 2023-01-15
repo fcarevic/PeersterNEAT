@@ -85,7 +85,7 @@ func (s *StreamInfo) getGradeForStream(streamID string) float64 {
 	grade := sum / float64(len(reactions))
 
 	// Update grade in list of all streams
-	log.Info().Msgf("Added reaction for stream %s: %ls", streamID, grade)
+	log.Info().Msgf("Added reaction for stream %s: %v", streamID, grade)
 	streamInfo, ok := s.availableStreams[streamID]
 	if !ok {
 		return 0.0
@@ -428,7 +428,7 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 	// Read chunk by chunk
 	var readBytes int
 
-	log.Info().Msgf("[%S] STREAM STARTING %s", n.conf.Socket.GetAddress(), streamInfo.StreamID)
+	log.Info().Msgf("[%s] STREAM STARTING %s", n.conf.Socket.GetAddress(), streamInfo.StreamID)
 
 	for {
 		//time.Sleep(STREAMSLEEPTIME)
@@ -785,8 +785,10 @@ func (n *node) streamAcceptMessageCallback(msg types.Message, pkt transport.Pack
 		return xerrors.Errorf("Failed to cast to StreamAcceptedMessage message got wrong type: %T", msg)
 	}
 
-	log.Info().Msgf("[%s] stream accept %s accepted %s", n.conf.Socket.GetAddress(),
-		streamAcceptMsg.StreamID, streamAcceptMsg.Accepted)
+	log.Info().Msgf(
+		"[%s] stream accept %s accepted %v", n.conf.Socket.GetAddress(),
+		streamAcceptMsg.StreamID, streamAcceptMsg.Accepted,
+	)
 
 	if !streamAcceptMsg.Accepted {
 		return nil
@@ -808,8 +810,10 @@ func (n *node) streamStopMessageCallback(msg types.Message, pkt transport.Packet
 		return xerrors.Errorf("Failed to cast to StreamStopMessage message got wrong type: %T", msg)
 	}
 
-	log.Info().Msgf("[%s] STREAM FINISHED  number of packets (sent %d), (received %d) %s",
-		n.conf.Socket.GetAddress())
+	log.Info().Msgf(
+		"[%s] STREAM FINISHED  number of packets",
+		n.conf.Socket.GetAddress(),
+	)
 	n.streamInfo.unregisterAvailableStream(streamStopMsg.StreamID)
 	err := n.streamInfo.unregisterListening(streamStopMsg.StreamID)
 	if err != nil {

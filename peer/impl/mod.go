@@ -19,6 +19,16 @@ var (
 
 // NewPeer creates a new peer. You can change the content and location of this
 // function, but you MUST NOT change its signature and package location.
+////Just for testing, should be deleted
+/*if n.conf.Socket.GetAddress() != "127.0.0.1:31111" {
+	n.AddPeer("127.0.0.1:31111")
+}
+if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
+	n.AddPeer("127.0.0.1:32222")
+}
+if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
+	n.AddPeer("127.0.0.1:33333")
+}*/
 func NewPeer(conf peer.Configuration) peer.Peer {
 	var n = node{
 		isRunning:    false,
@@ -85,7 +95,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		if n.conf.AntiEntropyInterval != 0 {
 			publicKey, privateKey, err := n.PkiInit(n.conf.Socket.GetAddress(), 100)
 			if err != nil {
-				log.Error().Msgf("pkiInit error", err)
+				log.Error().Msgf("pkiInit error %v", err)
 				return nil
 			}
 			n.pkiInfo = PKIInfo{privateKey, publicKey}
@@ -116,16 +126,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosPromiseMessage{}, n.paxosPromiseMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
-	////Just for testing, should be deleted
-	/*if n.conf.Socket.GetAddress() != "127.0.0.1:31111" {
-		n.AddPeer("127.0.0.1:31111")
-	}
-	if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
-		n.AddPeer("127.0.0.1:32222")
-	}
-	if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
-		n.AddPeer("127.0.0.1:33333")
-	}*/
+
 	return &n
 }
 

@@ -197,7 +197,12 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msgf("node %s downloading value for mh %s from peer %s", n.conf.Socket.GetAddress(), metahash, peerAddress)
+	log.Info().Msgf(
+		"node %s downloading value for mh %s from peer %s",
+		n.conf.Socket.GetAddress(),
+		metahash,
+		peerAddress,
+	)
 
 	// Create DataRequestMessage
 	msg := types.DataRequestMessage{
@@ -229,7 +234,7 @@ func (n *node) getValueForMetahash(metahash string) ([]byte, error) {
 		// Wait for timeout
 		select {
 		case <-n.notifyEnd:
-			log.Info().Msgf("node %s was stopped, getValueForMetahash stops.")
+			log.Info().Msgf("node %s was stopped, getValueForMetahash stops.", n.conf.Socket.GetAddress())
 			return nil, nil
 		case bytes := <-channel:
 			if bytes == nil {
@@ -324,7 +329,7 @@ func (n *node) Tag(name string, mh string) error {
 			if running {
 				select {
 				case <-n.notifyEnd:
-					log.Info().Msgf("node %s was stopped, Tag stops.")
+					log.Info().Msgf("node %s was stopped, Tag stops.", n.conf.Socket.GetAddress())
 					return nil
 
 					// This chaannel is waiting the end of previous proposer
@@ -490,7 +495,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (name
 		// Wait for the response
 		select {
 		case <-n.notifyEnd:
-			log.Info().Msgf("node %s was stopped, searchFirst stops.")
+			log.Info().Msgf("node %s was stopped, searchFirst stops.", n.conf.Socket.GetAddress())
 			return "", nil
 		case filename := <-channel:
 			return filename, err

@@ -71,7 +71,7 @@ func (n *node) CrowdsReact(streamID string, streamerID string, grade float64) er
 		recipients = append(recipients, n.conf.Socket.GetAddress())
 	}
 
-	log.Info().Msgf("node %s chose random peers for crowds react: %s", recipients)
+	log.Info().Msgf("node %s chose random peers for crowds react: %s", n.conf.Socket.GetAddress(), recipients)
 
 	err = n.SendCrowdsMessage(&crowdsMessagingReqMsgMarshalled, recipients)
 	if err != nil {
@@ -118,8 +118,10 @@ func (n *node) CrowdsDownload(peers []string, filename string) (bool, error) {
 	metahash := n.Resolve(filename)
 	if metahash == "" { // empty metahash
 		metahash = filename
-		log.Info().Msgf("crowds initator = %s; metahash is empty, filename will be used as metahash",
-			n.conf.Socket.GetAddress())
+		log.Info().Msgf(
+			"crowds initator = %s; metahash is empty, filename will be used as metahash",
+			n.conf.Socket.GetAddress(),
+		)
 	}
 
 	crowdsDownloadReqMsgMarshalled, err := n.CreateCrowdsDownloadRequest(requestID, metahash)
@@ -338,14 +340,18 @@ func (n *node) DownloadAndTransmit(metahash string, msg *types.CrowdsDownloadReq
 
 	filename := n.GetFileNameFromMetaHash(metahash)
 	if filename == "" {
-		return xerrors.Errorf("node %s could not find filename for given metahash %s during crowds download",
-			n.conf.Socket.GetAddress(), metahash)
+		return xerrors.Errorf(
+			"node %s could not find filename for given metahash %s during crowds download",
+			n.conf.Socket.GetAddress(), metahash,
+		)
 	}
 
 	_, err := n.SearchAll(*regexp.MustCompile(filename), 5, time.Second*3) // update catalog.
 	if err != nil {
-		log.Info().Msgf("[%s] error during search all in crowds: %s",
-			n.conf.Socket.GetAddress(), err.Error())
+		log.Info().Msgf(
+			"[%s] error during search all in crowds: %s",
+			n.conf.Socket.GetAddress(), err.Error(),
+		)
 		return err
 	}
 
@@ -446,14 +452,16 @@ func (n *node) TransmitChunk(
 
 func (n *node) GetFileNameFromMetaHash(metahash string) string {
 	filename := ""
-	n.conf.Storage.GetNamingStore().ForEach(func(key string, val []byte) bool {
-		if metahash != string(val) {
-			return true
-		}
+	n.conf.Storage.GetNamingStore().ForEach(
+		func(key string, val []byte) bool {
+			if metahash != string(val) {
+				return true
+			}
 
-		filename = key
-		return false
-	})
+			filename = key
+			return false
+		},
+	)
 
 	return filename
 }

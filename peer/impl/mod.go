@@ -39,35 +39,43 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			catalog:                    make(peer.Catalog),
 			dataRequestsMap:            make(map[string]chan []byte),
 			receivedRequests:           make(map[string]bool),
-			remoteFullyKnownMetahashes: make(map[string]chan string)},
+			remoteFullyKnownMetahashes: make(map[string]chan string),
+		},
 		multiPaxos: MultiPaxos{
 			paxos: Paxos{
 				mapPaxosPrepareIDs:   make(map[uint]chan PaxosToSend),
 				mapPaxosProposeIDs:   make(map[uint]chan types.PaxosAcceptMessage),
 				mapPaxosAcceptIDs:    make(map[string][]types.PaxosAcceptMessage),
 				notifyEndOfClockStep: make(chan types.BlockchainBlock, 5000),
-				channelSuccCons:      make(chan string, 5000)},
+				channelSuccCons:      make(chan string, 5000),
+			},
 			tlc: TLCInfo{
-				mapStepListTLCMsg: make(map[uint][]types.TLCMessage)},
+				mapStepListTLCMsg: make(map[uint][]types.TLCMessage),
+			},
 		},
 		streamInfo: StreamInfo{
 			mapClients:        make(map[string][]string),
 			mapKeysListening:  make(map[string][]byte),
 			mapListening:      make(map[string][]types.StreamMessage),
 			availableStreams:  make(map[string]types.StreamInfo),
-			mapFFMPG4channels: make(map[string]chan types.StreamMessage)},
+			mapFFMPG4channels: make(map[string]chan types.StreamMessage),
+		},
 		multicstInfo: MulticastInfo{
-			mapMulticastClients: make(map[string][]string)},
+			mapMulticastClients: make(map[string][]string),
+		},
 		chatInfo: ChatInfo{
-			messages: make([]peer.ChatMessageInfo, 0)},
+			messages: make([]peer.ChatMessageInfo, 0),
+		},
 		// PROJECT Naca
 		crowdsInfo: CrowdsInfo{
 			chunkMap:        NewAtomicChunkMap(),
-			chunkChannelMap: NewAtomicChannelTable()},
+			chunkChannelMap: NewAtomicChannelTable(),
+		},
 		// PROJECT Peja
 		pkiInfo: PKIInfo{
 			privateKey: nil,
-			publicKey:  nil},
+			publicKey:  nil,
+		},
 	}
 
 	// Add self-address to routing table
@@ -82,7 +90,10 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 			}
 			n.pkiInfo = PKIInfo{privateKey, publicKey}
 		} else {
-			n.conf.MessageRegistry.RegisterMessageCallback(types.ConfidentialityMessage{}, n.ProcessConfidentialityMessage)
+			n.conf.MessageRegistry.RegisterMessageCallback(
+				types.ConfidentialityMessage{},
+				n.ProcessConfidentialityMessage,
+			)
 		}
 		// Project
 		n.CrowdsInit(conf)
@@ -105,16 +116,16 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosPromiseMessage{}, n.paxosPromiseMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.PaxosAcceptMessage{}, n.paxosAcceptMessageCallback)
 	n.conf.MessageRegistry.RegisterMessageCallback(types.TLCMessage{}, n.tlcMessageCallback)
-	////TODO:Just for testing, should be deleted
-	//if n.conf.Socket.GetAddress() != "127.0.0.1:31111" {
-	//	n.AddPeer("127.0.0.1:31111")
-	//}
-	//if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
-	//	n.AddPeer("127.0.0.1:32222")
-	//}
-	//if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
-	//	n.AddPeer("127.0.0.1:33333")
-	//}
+	////Just for testing, should be deleted
+	/*if n.conf.Socket.GetAddress() != "127.0.0.1:31111" {
+		n.AddPeer("127.0.0.1:31111")
+	}
+	if n.conf.Socket.GetAddress() != "127.0.0.1:32222" {
+		n.AddPeer("127.0.0.1:32222")
+	}
+	if n.conf.Socket.GetAddress() != "127.0.0.1:33333" {
+		n.AddPeer("127.0.0.1:33333")
+	}*/
 	return &n
 }
 

@@ -32,7 +32,6 @@ type CrowdsDownloadBody struct {
 }
 
 func (c crowds) CrowdsSend() http.HandlerFunc {
-	// pozvati ficinu fju za registrovanje poruke da andrija ne pamti na frontu - opciono
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -67,7 +66,6 @@ func (c crowds) CrowdsSend() http.HandlerFunc {
 }
 
 func (c crowds) CrowdsDownload() http.HandlerFunc {
-	// pozvati ficinu fju za registrovanje poruke da andrija ne pamti na frontu - opciono
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+// 0 - 1 - 2 - 3
+// Node 0 downloads file using crowds
+// Node 0 streams downloaded file
+// Client react to stream
 func Test_Project_Integration_Test(t *testing.T) {
 	transp := channel.NewTransport()
 

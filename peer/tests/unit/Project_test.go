@@ -10,25 +10,6 @@ import (
 	"time"
 )
 
-// import (
-//
-//	"bufio"
-//	"bytes"
-//	"fmt"
-//	"math/rand"
-//	"regexp"
-//	"strings"
-//	"testing"
-//	"time"
-//
-//	"github.com/stretchr/testify/require"
-//	z "go.dedis.ch/cs438/internal/testing"
-//	"go.dedis.ch/cs438/peer"
-//	"go.dedis.ch/cs438/transport"
-//	"go.dedis.ch/cs438/transport/channel"
-//
-// )
-//
 // // 1-2
 // //
 // // Node starts streaming, but there is no peers wanting to join, thus the stream is finished without
@@ -516,54 +497,6 @@ func Test_Project_SimpleStream(t *testing.T) {
 	log.Info().Msgf("Test Done")
 }
 
-//
-//func Test_Project_FFMPG4_Stream(t *testing.T) {
-//	transp := udp.NewUDP()
-//	chunkSize := uint(12 * 1024) // The metafile can handle just 3 chunks
-//
-//	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",z.WithProjectFunctionalities(true),
-//	z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
-//	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0",z.WithProjectFunctionalities(true),
-//	z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
-//	defer node1.Stop()
-//	defer node2.Stop()
-//
-//	node1.AddPeer(node2.GetAddr())
-//	node2.AddPeer(node1.GetAddr())
-//	node1.Start()
-//	node2.Start()
-//
-//	movieName := "file"
-//	price := 10
-//
-//	streamID, err := node1.AnnounceStartStreaming(movieName, uint(price), []byte{})
-//	require.NoError(t, err)
-//
-//	// Wait for announcement to finish
-//	time.Sleep(10 * time.Millisecond)
-//	err = node2.ConnectToStream(streamID, node1.GetAddr())
-//	require.NoError(t, err)
-//
-//	// Wait for announcement to finish
-//	time.Sleep(10 * time.Millisecond)
-//
-//	clients, err := node1.GetClients(streamID)
-//	require.NoError(t, err)
-//	require.Len(t, clients, 1)
-//
-//	// Stream
-//	manifestName := "cetvhgn13hoh536ron4g.m3u8"
-//	dir := "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/video"
-//	go node1.StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID, []byte{})
-//
-//	dir = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/recvvideo"
-//	err = node2.ReceiveFFMPG4(streamID, dir)
-//	time.Sleep(120 * time.Second)
-//	// Node2 Should HAVE received all chunks
-//	require.NoError(t, err)
-//	log.Info().Msgf("Test Done")
-//}
-
 // // 3-2
 // //
 // // Node 1 streams. Node 3 becomes a client
@@ -934,6 +867,11 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 
 }
 
+// 1  - 2
+//   - 3
+//
+// Node 1 streams
+// Nodes 2 and 3 connect to stream and react
 func Test_Project_Rating_MultipleClients(t *testing.T) {
 	transp := channel.NewTransport()
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks

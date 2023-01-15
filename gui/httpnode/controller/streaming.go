@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-const VideoPath = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/gui/web/assets/hlsVideo"
+const VideoPath = "./web/assets/hlsVideo"
 
 type streaming struct {
 	node peer.Peer

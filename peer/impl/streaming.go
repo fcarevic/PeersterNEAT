@@ -1,7 +1,6 @@
 package impl
 
 import (
-	"fmt"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/transport"
@@ -114,8 +113,6 @@ func (s *StreamInfo) registerFFMPG4Channel(streamID string, channel chan types.S
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
 	_, ok := s.mapFFMPG4channels[streamID]
-	fmt.Println(streamID)
-	fmt.Println(s.mapFFMPG4channels)
 	if ok {
 		return xerrors.Errorf("Stream already exists")
 	}
@@ -273,7 +270,6 @@ func (s *StreamInfo) unregisterStreaming(streamID string) {
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
 	delete(s.mapClients, streamID)
-	return
 }
 func (s *StreamInfo) addStreamClient(streamID string, clientID string) error {
 	// Acquire lock
@@ -301,7 +297,7 @@ func (s *StreamInfo) addStreamClient(streamID string, clientID string) error {
 	return nil
 }
 
-func (s *StreamInfo) removeStreamClient(streamID string, clientID string) error {
+func (s *StreamInfo) RemoveStreamClient(streamID string, clientID string) error {
 	// Acquire lock
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
@@ -456,10 +452,6 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 			streamInfo.CurrentlyWatching = uint(len(clients))
 			streamInfo.Grade = n.streamInfo.getGradeForStream(streamInfo.StreamID)
 
-			//log.Info().Msgf("GRADE: %ls", streamInfo.Grade)
-			if err != nil {
-				return
-			}
 			streamData := types.StreamData{
 				StartIndex: uint(readBytes),
 				EndIndex:   uint(readBytes + numBytes),
@@ -474,44 +466,16 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 
 			payload, errConv := convertStreamMsgToPayload(streamMsg, symmetricKey)
 			if errConv != nil {
-				log.Error().Msgf(
-					"[%s]: stream: convertStreamMsgToPayload error: %s ",
-					n.conf.Socket.GetAddress(), errConv.Error(),
-				)
 				readBytes = numBytes + readBytes
 				continue
 			}
 
-			streamDataMsg := types.StreamDataMessage{
-				ID:      streamMsg.StreamInfo.StreamID,
-				Payload: payload,
-			}
-
-			transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(streamDataMsg)
+			errCast := n.multicastStreamData(streamMsg, payload)
 			if errCast != nil {
-				log.Error().Msgf(
-					"[%s]: stream: Marshalling error: %s ",
-					n.conf.Socket.GetAddress(), errConv.Error(),
-				)
 				readBytes = numBytes + readBytes
 				continue
 
 			}
-			multicastMsg := types.MulticastMessage{
-				ID:      streamMsg.StreamInfo.StreamID,
-				Message: &transportMsg,
-			}
-			errMulticast := n.Multicast(multicastMsg)
-			if errMulticast != nil {
-				log.Error().Msgf(
-					"[%s]: stream: Multicast for chunk [%d, %d] of stream %s failed: %s",
-					n.conf.Socket.GetAddress(), readBytes,
-					readBytes+numBytes, streamMsg.StreamInfo.StreamID, errMulticast.Error(),
-				)
-				readBytes = numBytes + readBytes
-				continue
-			}
-
 		}
 		readBytes = numBytes + readBytes
 
@@ -525,7 +489,28 @@ func (n *node) stream(data io.Reader, streamInfo types.StreamInfo, symmetricKey 
 	}
 
 }
+func (n *node) multicastStreamData(streamMsg types.StreamMessage, payload string) error {
+	streamDataMsg := types.StreamDataMessage{
+		ID:      streamMsg.StreamInfo.StreamID,
+		Payload: payload,
+	}
 
+	transportMsg, errCast := n.conf.MessageRegistry.MarshalMessage(streamDataMsg)
+	if errCast != nil {
+		log.Error().Msgf(
+			"[%s]: stream: Marshalling error: %s ",
+			n.conf.Socket.GetAddress(), errCast.Error(),
+		)
+		return errCast
+
+	}
+	multicastMsg := types.MulticastMessage{
+		ID:      streamMsg.StreamInfo.StreamID,
+		Message: &transportMsg,
+	}
+	errMulticast := n.Multicast(multicastMsg)
+	return errMulticast
+}
 func (n *node) getStreamInfo(streamID string) (types.StreamInfo, error) {
 	n.streamInfo.streamInfoMutex.Lock()
 	defer n.streamInfo.streamInfoMutex.Unlock()
@@ -617,7 +602,7 @@ func (n *node) AnnounceStopStreaming(streamID string) error {
 }
 
 func (s *StreamInfo) registerAvailableStream(stream types.StreamInfo) {
-	fmt.Println("stream available " + stream.Name)
+	log.Info().Msgf("stream available " + stream.Name)
 	s.streamInfoMutex.Lock()
 	defer s.streamInfoMutex.Unlock()
 	s.availableStreams[stream.StreamID] = stream
@@ -800,7 +785,10 @@ func (n *node) streamAcceptMessageCallback(msg types.Message, pkt transport.Pack
 		return xerrors.Errorf("Failed to cast to StreamAcceptedMessage message got wrong type: %T", msg)
 	}
 
-	if streamAcceptMsg.Accepted == false {
+	log.Info().Msgf("[%s] stream accept %s accepted %s", n.conf.Socket.GetAddress(),
+		streamAcceptMsg.StreamID, streamAcceptMsg.Accepted)
+
+	if !streamAcceptMsg.Accepted {
 		return nil
 	}
 	key, errDecr := n.decryptSymmetricKey(streamAcceptMsg.EncSymmetricKey, streamAcceptMsg.ClientID)

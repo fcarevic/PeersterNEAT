@@ -53,11 +53,10 @@ func stringToPublicKey(pemEncodedPub string) *rsa.PublicKey {
 	blockPub, _ := pem.Decode([]byte(pemEncodedPub))
 	x509EncodedPub := blockPub.Bytes
 	genericPublicKey, _ := x509.ParsePKIXPublicKey(x509EncodedPub)
-	publicKey := genericPublicKey.(*rsa.PublicKey)
-	return publicKey
+	return genericPublicKey.(*rsa.PublicKey)
 }
 
-func stringifyChainBlock(block ChainBlock) (string, error) {
+func stringifyChainBlock(block ChainBlock) string {
 	blockStr := ""
 	blockStr += block.senderAddress
 	blockStr += "\t"
@@ -71,10 +70,10 @@ func stringifyChainBlock(block ChainBlock) (string, error) {
 	blockStr += "\t"
 	blockStr += strconv.FormatFloat(block.amount, 'E', -1, 64)
 	blockStr += "\t"
-	return blockStr, nil
+	return blockStr
 }
 
-func chainBlockFromString(blockString string) (ChainBlock, error) {
+func chainBlockFromString(blockString string) ChainBlock {
 	var block ChainBlock
 	for i, part := range strings.Split(blockString, "\t") {
 		switch i {
@@ -92,28 +91,15 @@ func chainBlockFromString(blockString string) (ChainBlock, error) {
 			block.amount, _ = strconv.ParseFloat(part, 64)
 		}
 	}
-	return block, nil
+	return block
 }
 
-func stringifyTransport(msg transport.Message) (string, error) {
+func stringifyTransport(msg transport.Message) string {
 	blockStr := ""
 	blockStr += msg.Type
 	blockStr += "\t"
 	blockStr += string(msg.Payload)
-	return blockStr, nil
-}
-
-func transportFromString(blockString string) (transport.Message, error) {
-	var msg transport.Message
-	for i, part := range strings.Split(blockString, "\t") {
-		switch i {
-		case 0:
-			msg.Type = part
-		case 1:
-			msg.Payload = []byte(part)
-		}
-	}
-	return msg, nil
+	return blockStr
 }
 
 func (n *node) PutInitialBlockOnChain(publicKey *rsa.PublicKey, address string, amount float64) error {
@@ -125,11 +111,9 @@ func (n *node) PutInitialBlockOnChain(publicKey *rsa.PublicKey, address string, 
 		amount:            amount,
 		streamID:          "нема још",
 	}
-	mh, err := stringifyChainBlock(block)
-	if err != nil {
-		return err
-	}
-	go n.Tag(xid.New().String(), mh)
+	go func() {
+		_ = n.Tag(xid.New().String(), stringifyChainBlock(block))
+	}()
 	return nil
 }
 
@@ -163,11 +147,7 @@ func decryptMsg(cipherMsg []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
 }
 
 func (n *node) EncryptMsg(msg transport.Message, key *rsa.PublicKey) (*types.ConfidentialityMessage, error) {
-	s, err := stringifyTransport(msg)
-	log.Info().Msgf("encrypt msg unutra %s", s)
-	if err != nil {
-		return nil, err
-	}
+	s := stringifyTransport(msg)
 	cipherMsg, err := encryptMsg([]byte(s), key)
 
 	log.Info().Msgf("encrypt msg unutra ciphermsg %x %s", cipherMsg, err)
@@ -304,7 +284,6 @@ func (n *node) ProcessConfidentialityMessage(msg types.Message, pkt transport.Pa
 
 	decryptedMsg, err := n.DecryptedMsg(confMsg.CipherMessage, n.pkiInfo.privateKey)
 	if err != nil {
-		fmt.Println(err.Error())
 		return err
 	}
 	var transportMsg transport.Message
@@ -350,10 +329,7 @@ func (n *node) GetPublicKey(address string) (*rsa.PublicKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		chainBlock, err := chainBlockFromString(block.Value.Metahash)
-		if err != nil {
-			return nil, err
-		}
+		chainBlock := chainBlockFromString(block.Value.Metahash)
 		if chainBlock.senderAddress == address {
 			return chainBlock.senderPublicKey, nil
 		}
@@ -381,10 +357,7 @@ func (n *node) GetAmount(address string) (float64, error) {
 		if err != nil {
 			return errAmount, err
 		}
-		chainBlock, err := chainBlockFromString(block.Value.Metahash)
-		if err != nil {
-			return errAmount, err
-		}
+		chainBlock := chainBlockFromString(block.Value.Metahash)
 		if chainBlock.receiverAddress == address {
 			amount += chainBlock.amount
 		} else if chainBlock.senderAddress == address {
@@ -420,10 +393,7 @@ func (n *node) PaySubscription(senderAddress, receiverAddress, streamID string, 
 		amount:            amount,
 		streamID:          streamID,
 	}
-	mh, err := stringifyChainBlock(block)
-	if err != nil {
-		return err
-	}
+	mh := stringifyChainBlock(block)
 	return n.Tag(xid.New().String(), mh)
 }
 
@@ -447,10 +417,7 @@ func (n *node) PaySubscriptionFull(
 		amount:            amount,
 		streamID:          streamID,
 	}
-	mh, err := stringifyChainBlock(block)
-	if err != nil {
-		return err
-	}
+	mh := stringifyChainBlock(block)
 	return n.Tag(xid.New().String(), mh)
 }
 
@@ -470,10 +437,7 @@ func doubleCheckPayment(
 		if err != nil {
 			return errAmount, err
 		}
-		chainBlock, err := chainBlockFromString(block.Value.Metahash)
-		if err != nil {
-			return errAmount, err
-		}
+		chainBlock := chainBlockFromString(block.Value.Metahash)
 		if chainBlock.receiverAddress == senderAddress {
 			prevAmount += chainBlock.amount
 		} else if chainBlock.senderAddress == senderAddress {
@@ -482,6 +446,29 @@ func doubleCheckPayment(
 		lastBlockHashHex = hex.EncodeToString(block.PrevHash)
 	}
 	return prevAmount, nil
+}
+
+func checkStreamAmount(chainBlock ChainBlock, senderAddress, receiverAddress, streamID string, amount float64,
+	BlockchainStore storage.Store, lastBlockHashHex, endBlockHasHex string) (bool, error) {
+
+	if !(chainBlock.senderAddress == senderAddress &&
+		chainBlock.receiverAddress == receiverAddress &&
+		chainBlock.streamID == streamID) {
+		return false, nil
+	}
+	if chainBlock.amount == amount {
+		// check transaction validity
+		prevAmount, err := doubleCheckPayment(senderAddress, lastBlockHashHex, endBlockHasHex, BlockchainStore)
+		if err != nil {
+			return false, err
+		}
+		// check transaction validity done ===
+		if prevAmount < amount {
+			return false, xerrors.New("User did not have enough money but somehow paid!")
+		}
+		return true, nil
+	}
+	return false, fmt.Errorf("subscription not found, but paid: %f insted of %f", chainBlock.amount, amount)
 }
 
 func (n *node) IsPayedSubscription(senderAddress, receiverAddress, streamID string, amount float64) (bool, error) {
@@ -498,28 +485,14 @@ func (n *node) IsPayedSubscription(senderAddress, receiverAddress, streamID stri
 		if err != nil {
 			return false, err
 		}
-		chainBlock, err := chainBlockFromString(block.Value.Metahash)
+		chainBlock := chainBlockFromString(block.Value.Metahash)
+		flag, err := checkStreamAmount(chainBlock, senderAddress, receiverAddress, streamID, amount,
+			BlockchainStore, lastBlockHashHex, endBlockHasHex)
 		if err != nil {
 			return false, err
 		}
-		if chainBlock.senderAddress == senderAddress &&
-			chainBlock.receiverAddress == receiverAddress &&
-			chainBlock.streamID == streamID {
-
-			if chainBlock.amount == amount {
-				// check transaction validity
-				prevAmount, err := doubleCheckPayment(senderAddress, lastBlockHashHex, endBlockHasHex, BlockchainStore)
-				if err != nil {
-					return false, err
-				}
-				// check transaction validity done ===
-				if prevAmount < amount {
-					return false, xerrors.New("User did not have enough money but somehow paid!")
-				}
-				return true, nil
-			} else {
-				return false, fmt.Errorf("subscription not found, but paid: %f insted of %f", chainBlock.amount, amount)
-			}
+		if flag {
+			return true, nil
 		}
 		lastBlockHashHex = hex.EncodeToString(block.PrevHash)
 	}
@@ -535,10 +508,7 @@ func (n *node) SetInitBlock(publicKey *rsa.PublicKey, address string, amount flo
 		amount:            amount,
 		streamID:          "нема још",
 	}
-	mh, err := stringifyChainBlock(chainBlock)
-	if err != nil {
-		return err
-	}
+	mh := stringifyChainBlock(chainBlock)
 	lastBlock := n.conf.Storage.GetBlockchainStore().Get(storage.LastBlockKey)
 	if lastBlock == nil {
 		lastBlock = make([]byte, 32)

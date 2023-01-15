@@ -18,6 +18,8 @@ type Peer interface {
 	Multicast
 	Chatting
 
+	// PROJECT Andrija
+	Hls
 	// PROJECT NACA
 	Crowds
 	// PROJECT RADE

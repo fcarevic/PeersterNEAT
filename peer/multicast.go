@@ -20,4 +20,7 @@ type Multicast interface {
 
 	// StopMulticast announce that the stream has ended.
 	StopMulticast(streamID string, message transport.Message) error
+
+	// Removes the multicast client
+	RemoveMulticastClient(streamID string, client string) error
 }

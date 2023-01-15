@@ -3,7 +3,6 @@ package impl
 import (
 	"bufio"
 	"encoding/hex"
-	"fmt"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/types"
@@ -11,7 +10,8 @@ import (
 	"strings"
 )
 
-//const ROOTDIR = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/video"
+// const ROOTDIR = "/home/andrijajelenkovic/Documents/EPFL/dse/PeersterNEAT/video"
+const METAFILEEND = "#EXT-X-ENDLIST"
 
 func (n *node) encryptSymmetricKey(symmetricKey []byte, address string) ([]byte, error) {
 
@@ -46,8 +46,6 @@ func (n *node) StreamFFMPG4(
 		log.Error().Msgf("%s", err.Error())
 		return
 	}
-	fmt.Println("asd")
-	log.Error().Msgf("Here")
 	defer file.Close()
 	s := bufio.NewScanner(file)
 	s.Split(bufio.ScanLines)
@@ -55,10 +53,9 @@ func (n *node) StreamFFMPG4(
 	lines := -1
 	for s.Scan() {
 		lines++
-		fmt.Println(lines)
 		command := s.Text()
 		encoded := ""
-		if command == "#EXT-X-ENDLIST" {
+		if command == METAFILEEND {
 			encoded = command
 		} else if strings.Contains(command, "EXTINF") {
 			s.Scan()
@@ -85,12 +82,7 @@ func (n *node) StreamFFMPG4(
 		//time.Sleep(time.Second)
 
 		log.Error().Msgf("%d", n)
-
-		if err != nil {
-			log.Error().Msgf("%s", err.Error())
-		}
 	}
-	fmt.Println("finished")
 }
 
 func (n *node) ReceiveFFMPG4(streamID string, dir string) error {
@@ -129,7 +121,7 @@ func (n *node) ReceiveFFMPG4(streamID string, dir string) error {
 }
 
 func WriteEndOfFFMPG4Metafile(dir string, streamID string) {
-	command := "#EXT-X-ENDLIST"
+	command := METAFILEEND
 	f, errOpenMetaFile := os.OpenFile(dir+"/"+streamID+".m3u8", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if errOpenMetaFile != nil {
 		log.Error().Msgf(
@@ -139,12 +131,10 @@ func WriteEndOfFFMPG4Metafile(dir string, streamID string) {
 	}
 
 	if _, errCmdWrite := f.WriteString(command); errCmdWrite != nil {
-		if errCmdWrite != nil {
-			log.Error().Msgf(
-				"Error while wiritng data to a file %s in received FFMPG4 %s",
-				command, errCmdWrite.Error(),
-			)
-		}
+		log.Error().Msgf(
+			"Error while wiritng data to a file %s in received FFMPG4 %s",
+			command, errCmdWrite.Error(),
+		)
 	}
 }
 
@@ -153,7 +143,7 @@ func decodeFFMPG4StreamMessage(chunk types.StreamMessage, dir string, streamID s
 	splitted := strings.Split(encoded, peer.MetafileSep)
 	command := splitted[0]
 	toWrite := ""
-	if command == "#EXT-X-ENDLIST" {
+	if command == METAFILEEND {
 		toWrite = command
 	} else if strings.Contains(command, "EXTINF") {
 		filename := splitted[1]
@@ -162,8 +152,7 @@ func decodeFFMPG4StreamMessage(chunk types.StreamMessage, dir string, streamID s
 			log.Error().Msgf("Error while decoding data chunk in recevied FFMPG4 %s", errDec.Error())
 			return
 		}
-		errWrite := os.WriteFile(dir+"/"+filename, dataDec, 0666)
-		fmt.Println(dir + "/" + filename)
+		errWrite := os.WriteFile(dir+"/"+filename, dataDec, 0600)
 		if errWrite != nil {
 			log.Error().Msgf(
 				"Error while writing data to a file %s in recevied FFMPG4 %s",
@@ -191,12 +180,11 @@ func decodeFFMPG4StreamMessage(chunk types.StreamMessage, dir string, streamID s
 	}
 
 	if _, errCmdWrite := f.WriteString(toWrite); errCmdWrite != nil {
-		if errCmdWrite != nil {
-			log.Error().Msgf(
-				"Error while wiritng data to a file %s in received FFMPG4 %s",
-				toWrite, errCmdWrite.Error(),
-			)
-		}
+		log.Error().Msgf(
+			"Error while wiritng data to a file %s in received FFMPG4 %s",
+			toWrite, errCmdWrite.Error(),
+		)
+
 	}
 
 	errClose := f.Close()

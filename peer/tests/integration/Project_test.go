@@ -14,14 +14,18 @@ import (
 func Test_Project_Integration_Test(t *testing.T) {
 	transp := channel.NewTransport()
 
-	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithProjectFunctionalities(true),
-		z.WithChunkSize(1024), z.WithPaxosID(1), z.WithAntiEntropy(time.Second))
-	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(1024), z.WithProjectFunctionalities(true),
-		z.WithTotalPeers(4), z.WithPaxosID(2), z.WithAntiEntropy(time.Second))
-	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithProjectFunctionalities(true),
-		z.WithChunkSize(1024), z.WithPaxosID(3), z.WithAntiEntropy(time.Second))
-	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4), z.WithProjectFunctionalities(true),
-		z.WithChunkSize(1024), z.WithPaxosID(4), z.WithAntiEntropy(time.Second))
+	node0 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4),
+		z.WithContinueMongering(1), z.WithProjectFunctionalities(true),
+		z.WithChunkSize(1024), z.WithPaxosID(1), z.WithAntiEntropy(20*time.Millisecond))
+	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(1024),
+		z.WithContinueMongering(1), z.WithProjectFunctionalities(true),
+		z.WithTotalPeers(4), z.WithPaxosID(2), z.WithAntiEntropy(20*time.Millisecond))
+	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4),
+		z.WithContinueMongering(1), z.WithProjectFunctionalities(true),
+		z.WithChunkSize(1024), z.WithPaxosID(3), z.WithAntiEntropy(20*time.Millisecond))
+	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(4),
+		z.WithContinueMongering(1), z.WithProjectFunctionalities(true),
+		z.WithChunkSize(1024), z.WithPaxosID(4), z.WithAntiEntropy(20*time.Millisecond))
 
 	defer node0.Stop()
 	defer node1.Stop()

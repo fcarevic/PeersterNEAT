@@ -2,7 +2,6 @@ package integration
 
 import (
 	"fmt"
-	"go.dedis.ch/cs438/transport/channel"
 	"go.dedis.ch/cs438/transport/udp"
 	"os"
 	"runtime"
@@ -19,7 +18,7 @@ var referenceFac peer.Factory
 var proxyFac transport.Factory = proxy.NewProxy
 var peerFac peer.Factory = impl.NewPeer
 
-var channelFac transport.Factory = channel.NewTransport
+// var channelFac transport.Factory = channel.NewTransport
 var udpFac transport.Factory = udp.NewUDP
 
 func init() {

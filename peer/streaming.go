@@ -5,8 +5,6 @@ import (
 	"io"
 )
 
-const STREAMINGSIZE = 65536
-
 // Streaming describes functions used in multicast streaming
 type Streaming interface {
 	// AnnounceStartStreaming starts streaming of provided file, returns the ID of stream.
@@ -21,20 +19,19 @@ type Streaming interface {
 	// GetClients Returns the clients for the chosen stream
 	GetClients(streamID string) ([]string, error)
 
-	// ConnectToStream Join the stream with corresponding ID. Returns error if the stream does not exist or the join was unsuccessful.
+	// RemoveStreamClient removes the client
+	RemoveStreamClient(streamID string, clientID string) error
+
+	// ConnectToStream Join the stream with corresponding ID. Returns error if the
+	//stream does not exist or the join was unsuccessful.
 	ConnectToStream(streamID string, streamerID string) error
 
 	// ReactToStream send reaction for streamID
 	ReactToStream(streamID string, streamerID string, grade float64) error
 
-	// GetNextChunks returns numberOfChunks last received chunks for the streamID. returns error if the chunk does not exist.
+	// GetNextChunks returns numberOfChunks last received chunks for the streamID.
+	//returns error if the chunk does not exist.
 	GetNextChunks(streamID string, numberOfChunks int) ([]types.StreamMessage, error)
-
-	// StreamFFMPG4 streams video clips
-	StreamFFMPG4(manifestName string, dir string, name string, price uint, streamID string, thumbnail []byte)
-
-	// ReceiveFFMPG4 receives and decodes video clips
-	ReceiveFFMPG4(streamID string, dir string) error
 
 	// GetAllStreams returns all available streams in the network
 	GetAllStreams() []types.StreamInfo

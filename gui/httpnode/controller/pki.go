@@ -3,7 +3,6 @@ package controller
 import (
 	"crypto/rsa"
 	"encoding/json"
-	"fmt"
 	"github.com/rs/zerolog"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/transport"
@@ -25,14 +24,9 @@ type pki struct {
 	log  *zerolog.Logger
 }
 
-type PKISendBody struct {
-	msg       transport.Message
-	publicKey *rsa.PublicKey
-}
-
 type PKIDecryptBody struct {
-	cipherMsg  []byte
-	privateKey *rsa.PrivateKey
+	CipherMsg  []byte          `json:"cipherMsg"`
+	PrivateKey *rsa.PrivateKey `json:"privateKey"`
 }
 
 func (c pki) PKIDecrypt() http.HandlerFunc {
@@ -57,7 +51,7 @@ func (c pki) PKIDecrypt() http.HandlerFunc {
 				return
 			}
 
-			msg, err := c.node.DecryptedMsg(res.cipherMsg, res.privateKey)
+			msg, err := c.node.DecryptedMsg(res.CipherMsg, res.PrivateKey)
 			if err != nil {
 				return
 			}
@@ -76,7 +70,7 @@ func (c pki) PKIDecrypt() http.HandlerFunc {
 }
 
 type PKIPublicKeyBody struct {
-	address string
+	Address string `json:"address"`
 }
 
 func (c pki) PKIPublicKey() http.HandlerFunc {
@@ -101,7 +95,7 @@ func (c pki) PKIPublicKey() http.HandlerFunc {
 				return
 			}
 
-			key, err := c.node.GetPublicKey(res.address)
+			key, err := c.node.GetPublicKey(res.Address)
 			if err != nil {
 				return
 			}
@@ -170,7 +164,6 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			fmt.Println("asd")
 			buf, err := io.ReadAll(r.Body)
 			if err != nil {
 				http.Error(w, "failed To read Body: "+err.Error(), http.StatusInternalServerError)
@@ -201,12 +194,12 @@ func (c pki) PKIPaySubscription() http.HandlerFunc {
 }
 
 type PKIPaySubscriptionFullBody struct {
-	senderAddress     string
-	senderPublicKey   *rsa.PublicKey
-	receiverAddress   string
-	receiverPublicKey *rsa.PublicKey
-	streamID          string
-	amount            float64
+	SenderAddress     string         `json:"senderAddress"`
+	SenderPublicKey   *rsa.PublicKey `json:"senderPublicKey"`
+	ReceiverAddress   string         `json:"receiverAddress"`
+	ReceiverPublicKey *rsa.PublicKey `json:"receiverPublicKey"`
+	StreamID          string         `json:"streamID"`
+	Amount            float64        `json:"amount"`
 }
 
 func (c pki) PKIPaySubscriptionFull() http.HandlerFunc {
@@ -232,8 +225,8 @@ func (c pki) PKIPaySubscriptionFull() http.HandlerFunc {
 			}
 
 			err = c.node.PaySubscriptionFull(
-				res.senderAddress, res.senderPublicKey,
-				res.receiverAddress, res.receiverPublicKey, res.streamID, res.amount,
+				res.SenderAddress, res.SenderPublicKey,
+				res.ReceiverAddress, res.ReceiverPublicKey, res.StreamID, res.Amount,
 			)
 			if err != nil {
 				return
@@ -249,8 +242,10 @@ func (c pki) PKIPaySubscriptionFull() http.HandlerFunc {
 }
 
 type PKICheckPaidBody struct {
-	senderAddress, receiverAddress, streamID string
-	amount                                   float64
+	SenderAddress   string  `json:"senderAddress"`
+	ReceiverAddress string  `json:"receiverAddress"`
+	StreamID        string  `json:"streamID"`
+	Amount          float64 `json:"amount"`
 }
 
 func (c pki) PKICheckPaid() http.HandlerFunc {
@@ -276,10 +271,10 @@ func (c pki) PKICheckPaid() http.HandlerFunc {
 			}
 
 			subscription, err := c.node.IsPayedSubscription(
-				res.senderAddress,
-				res.receiverAddress,
-				res.streamID,
-				res.amount,
+				res.SenderAddress,
+				res.ReceiverAddress,
+				res.StreamID,
+				res.Amount,
 			)
 			if err != nil {
 				return
@@ -303,9 +298,9 @@ func (c pki) PKICheckPaid() http.HandlerFunc {
 }
 
 type PKIPutInitialBlockOnChainBody struct {
-	publicKey *rsa.PublicKey
-	address   string
-	amount    float64
+	PublicKey *rsa.PublicKey `json:"publicKey"`
+	Address   string         `json:"address"`
+	Amount    float64        `json:"amount"`
 }
 
 func (c pki) PKIPutInitialBlockOnChain() http.HandlerFunc {
@@ -330,7 +325,7 @@ func (c pki) PKIPutInitialBlockOnChain() http.HandlerFunc {
 				return
 			}
 
-			err = c.node.PutInitialBlockOnChain(res.publicKey, res.address, res.amount)
+			err = c.node.PutInitialBlockOnChain(res.PublicKey, res.Address, res.Amount)
 			if err != nil {
 				return
 			}
@@ -349,7 +344,7 @@ type SendPrivateMessageBody struct {
 	To   string `json:"To"`
 }
 
-func (p pki) SendPrivateMessage() http.HandlerFunc {
+func (c pki) SendPrivateMessage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
@@ -383,7 +378,7 @@ func (p pki) SendPrivateMessage() http.HandlerFunc {
 				Payload: payload,
 			}
 
-			_, err = p.node.SendEncryptedMsg(transportMsg, res.To)
+			_, err = c.node.SendEncryptedMsg(transportMsg, res.To)
 			if err != nil {
 				http.Error(
 					w, "failed To send private message: "+err.Error(),

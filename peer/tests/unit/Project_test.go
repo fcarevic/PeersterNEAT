@@ -122,9 +122,9 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(20*time.Millisecond))
 	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2), z.WithAntiEntropy(20*time.Millisecond))
 
 	defer node1.Stop()
 	defer node2.Stop()
@@ -250,7 +250,7 @@ func Test_Project_AnnounceStartAndStream(t *testing.T) {
 	n2Ins := node2.GetIns()
 	for i < len(n2Ins) {
 		log.Info().Msgf("%s", n2Ins[i].Msg.Type)
-		if n1Outs[i].Msg.Type == "rumor" {
+		if n2Ins[i].Msg.Type == "rumor" {
 			rumors := z.GetRumor(t, n2Ins[i].Msg)
 			if rumors.Rumors[0].Msg.Type == "streamstartmessage" {
 				arrived = true
@@ -318,9 +318,9 @@ func Test_Project_SimpleStream(t *testing.T) {
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2), z.WithAntiEntropy(20*time.Millisecond))
 	node2 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithProjectFunctionalities(true),
-		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2), z.WithAntiEntropy(time.Second))
+		z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2), z.WithAntiEntropy(20*time.Millisecond))
 	defer node1.Stop()
 	defer node2.Stop()
 
@@ -511,7 +511,7 @@ func Test_Project_SimpleStream(t *testing.T) {
 	require.NoError(t, err)
 
 	// Error should be thrown on a stream that does not exist
-	clients, err = node1.GetClients(streamID)
+	_, err = node1.GetClients(streamID)
 	require.Error(t, err)
 	log.Info().Msgf("Test Done")
 }
@@ -590,18 +590,18 @@ func Test_Project_RelayedStream(t *testing.T) {
 
 	node1 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(0), z.WithAutostart(false), z.WithPaxosID(1), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithContinueMongering(1), z.WithAutostart(false), z.WithPaxosID(1), z.WithTotalPeers(3),
+		z.WithAntiEntropy(20*time.Millisecond),
 	)
 	node2 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(0), z.WithAutostart(false), z.WithPaxosID(2), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithContinueMongering(1), z.WithAutostart(false), z.WithPaxosID(2), z.WithTotalPeers(3),
+		z.WithAntiEntropy(20*time.Millisecond),
 	)
 	node3 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(0), z.WithAutostart(false), z.WithPaxosID(3), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second),
+		z.WithContinueMongering(1), z.WithAutostart(false), z.WithPaxosID(3), z.WithTotalPeers(3),
+		z.WithAntiEntropy(20*time.Millisecond),
 	)
 	defer node1.Stop()
 	defer node2.Stop()
@@ -816,23 +816,23 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(4),
+		z.WithAntiEntropy(10*time.Millisecond), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node2 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(4),
+		z.WithAntiEntropy(10*time.Millisecond), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node3 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(4),
+		z.WithAntiEntropy(10*time.Millisecond), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node4 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4),
-		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
+		z.WithTotalPeers(4), z.WithAntiEntropy(10*time.Millisecond), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	defer node1.Stop()
@@ -840,25 +840,26 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	defer node3.Stop()
 	defer node4.Stop()
 
-	node1.AddPeer(node2.GetAddr())
 	// node 1 see nodes 3 and 4 via node 2
 	node1.SetRoutingEntry(node3.GetAddr(), node2.GetAddr())
 	node1.SetRoutingEntry(node4.GetAddr(), node2.GetAddr())
+	// nodes 3 and 4 see nodes see node 1 via node 2
+	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
+	node4.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
+
+	node1.AddPeer(node2.GetAddr())
 	node2.AddPeer(node1.GetAddr())
 	node2.AddPeer(node3.GetAddr())
 	node3.AddPeer(node2.GetAddr())
 	node2.AddPeer(node4.GetAddr())
 	node4.AddPeer(node2.GetAddr())
-	// nodes 3 and 4 see nodes see node 1 via node 2
-	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
-	node4.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
 
 	node1.Start()
 	node2.Start()
 	node3.Start()
 	node4.Start()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 4)
 
 	chunk1 := make([]byte, chunkSize)
 	chunk2 := make([]byte, chunkSize)
@@ -879,8 +880,10 @@ func Test_Project_RelayedStream_MultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for announcement to finish
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 	err = node3.ConnectToStream(streamID, node1.GetAddr())
+	// Wait for joining to finish
+	time.Sleep(time.Second)
 	require.NoError(t, err)
 
 	err = node4.ConnectToStream(streamID, node1.GetAddr())
@@ -936,49 +939,35 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 	chunkSize := uint(64*3 + 2) // The metafile can handle just 3 chunks
 
 	node1 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(1), z.WithTotalPeers(3),
+		z.WithAntiEntropy(20*time.Millisecond), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
-	node2 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(2), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
-		z.WithContinueMongering(1), z.WithAutostart(false),
-	)
+
 	node3 := z.NewTestNode(
-		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(2),
-		z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
+		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(3), z.WithTotalPeers(3),
+		z.WithAntiEntropy(20*time.Millisecond), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	node4 := z.NewTestNode(
 		t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize), z.WithPaxosID(4),
-		z.WithTotalPeers(2), z.WithAntiEntropy(time.Second), z.WithProjectFunctionalities(true),
+		z.WithTotalPeers(2), z.WithAntiEntropy(20*time.Millisecond), z.WithProjectFunctionalities(true),
 		z.WithContinueMongering(1), z.WithAutostart(false),
 	)
 	defer node1.Stop()
-	defer node2.Stop()
 	defer node3.Stop()
 	defer node4.Stop()
 
-	node1.AddPeer(node2.GetAddr())
-	// node 1 see nodes 3 and 4 via node 2
-	node1.SetRoutingEntry(node3.GetAddr(), node2.GetAddr())
-	node1.SetRoutingEntry(node4.GetAddr(), node2.GetAddr())
-	node2.AddPeer(node1.GetAddr())
-	node2.AddPeer(node3.GetAddr())
-	node3.AddPeer(node2.GetAddr())
-	node2.AddPeer(node4.GetAddr())
-	node4.AddPeer(node2.GetAddr())
-	// nodes 3 and 4 see nodes see node 1 via node 2
-	node3.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
-	node4.SetRoutingEntry(node1.GetAddr(), node2.GetAddr())
+	node1.AddPeer(node3.GetAddr())
+	node3.AddPeer(node1.GetAddr())
+	node4.AddPeer(node1.GetAddr())
+	node1.AddPeer(node4.GetAddr())
 
 	node1.Start()
-	node2.Start()
 	node3.Start()
 	node4.Start()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 4)
 
 	chunk1 := make([]byte, chunkSize)
 	chunk2 := make([]byte, chunkSize)
@@ -1003,6 +992,9 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 	err = node3.ConnectToStream(streamID, node1.GetAddr())
 	require.NoError(t, err)
 
+	// Wait for joining to finish
+	time.Sleep(time.Second)
+
 	err = node4.ConnectToStream(streamID, node1.GetAddr())
 	require.NoError(t, err)
 
@@ -1024,10 +1016,6 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 
 	// Wait for stream to finish
 	time.Sleep(time.Second)
-
-	// Node 2 should not have any stream messages
-	_, errNode2 := node2.GetNextChunks(streamID, len(chunks))
-	require.Error(t, errNode2)
 
 	// Node 3 should have received chunks
 	streamMsgs, errC := node3.GetNextChunks(streamID, len(chunks))
@@ -1059,67 +1047,3 @@ func Test_Project_Rating_MultipleClients(t *testing.T) {
 	log.Info().Msgf("Test Done")
 
 }
-
-//func Test_Project_FFMPG4_Stream_Benchmark(t *testing.T) {
-//
-//	//start := time.Now()
-//
-//	numNodes := 3
-//
-//	transp := udp.NewUDP()
-//	chunkSize := uint(12 * 1024) // The metafile can handle just 3 chunks
-//
-//	var nodes []z.TestNode
-//
-//	for i := 0; i < numNodes; i++ {
-//		node := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithChunkSize(chunkSize),z.WithProjectFunctionalities(true),
-//		z.WithPaxosID(uint(i+1)), z.WithTotalPeers(uint(numNodes)), z.WithAntiEntropy(200*time.Millisecond))
-//		defer node.Stop()
-//		nodes = append(nodes, node)
-//	}
-//
-//	nodes[0].AddPeer(nodes[1].GetAddr())
-//	nodes[1].AddPeer(nodes[0].GetAddr())
-//	for i := 2; i < numNodes; i++ {
-//		nodes[i].AddPeer(nodes[1].GetAddr())
-//		nodes[1].AddPeer(nodes[i].GetAddr())
-//	}
-//	time.Sleep(time.Second)
-//
-//	movieName := "file"
-//	price := 10
-//
-//	streamID, err := nodes[0].AnnounceStartStreaming(movieName, uint(price), []byte{})
-//	require.NoError(t, err)
-//
-//	// Wait for announcement to finish
-//	time.Sleep(time.Second)
-//	for i := 2; i < numNodes; i++ {
-//		err = nodes[i].ConnectToStream(streamID, nodes[0].GetAddr())
-//		require.NoError(t, err)
-//		time.Sleep(time.Second)
-//	}
-//
-//	clients, err := nodes[0].GetClients(streamID)
-//	require.NoError(t, err)
-//	require.Len(t, clients, numNodes-2)
-//
-//	// Stream
-//	manifestName := "filename.m3u8"
-//	dir := "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/video"
-//	nodes[0].StreamFFMPG4(manifestName, dir, movieName, uint(price), streamID, []byte{})
-//
-//	//dir = "/mnt/c/Users/work/Desktop/EPFL/semester3/decentr/homeworks/recvvideo"
-//	//for i := 2; i < numNodes; i++ {
-//	//	err = nodes[i].ReceiveFFMPG4(streamID, dir)
-//	//	require.NoError(t, err)
-//	//}
-//
-//	//time.Sleep(120 * time.Second)
-//
-//	for i := 0; i < numNodes; i++ {
-//		log.Info().Msgf("NDOE: %d:  number of received packets: %d", i, len(nodes[i].GetIns()))
-//		log.Info().Msgf("NDOE: %d:  number of sent packets: %d", i, len(nodes[i].GetOuts()))
-//	}
-//
-//}

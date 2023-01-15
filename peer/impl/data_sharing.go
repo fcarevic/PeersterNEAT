@@ -3,7 +3,6 @@ package impl
 import (
 	"crypto"
 	"encoding/hex"
-	"fmt"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
@@ -258,7 +257,6 @@ func (n *node) getRandomPeerForDownload(metahash string) (string, error) {
 	// Check if exist peers for the metahash
 	var peerMap, ok = catalog[metahash]
 	if !ok {
-		fmt.Println("asd")
 		return "", xerrors.Errorf("No information for random download peer.")
 	}
 

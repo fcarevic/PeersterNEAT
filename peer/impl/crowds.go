@@ -144,7 +144,7 @@ func (n *node) CrowdsDownload(peers []string, filename string) (bool, error) {
 				return true, nil
 			}
 
-			err = os.WriteFile("./downloaded_"+filename, file, 0644)
+			err = os.WriteFile("./downloaded_"+filename, file, 0600)
 			if err != nil {
 				log.Error().Msgf("error while writing file to disc %s", err)
 			}

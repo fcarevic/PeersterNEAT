@@ -31,7 +31,7 @@ func (f filesharing) GetLocalFilesHandler() http.HandlerFunc {
 		case http.MethodGet:
 			blobStore := f.conf.Storage.GetDataBlobStore()
 			files := make([]LocalFile, 0)
-			regex, err := regexp.Compile("([a-z0-9]{64}\\n)*[a-z0-9]{64}$")
+			regex, err := regexp.Compile(`([a-z0-9]{64}\n)*[a-z0-9]{64}$`)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

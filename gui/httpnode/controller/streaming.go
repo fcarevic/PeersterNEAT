@@ -3,7 +3,6 @@ package controller
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/cs438/peer"
@@ -28,20 +27,20 @@ type AnnounceStreamBody struct {
 type StartStreamBody struct {
 	Name         string
 	Price        uint
-	StreamId     string
+	StreamID     string
 	ManifestName string
 	Dir          string
 	Image        string
 }
 
 type Stream struct {
-	StreamId   string  `json:"streamId"`
+	StreamID   string  `json:"streamId"`
 	Name       string  `json:"name"`
 	Price      uint    `json:"price"`
 	Grade      float64 `json:"grade"`
 	Viewers    uint    `json:"viewers"`
 	Image      string  `json:"image"`
-	StreamerId string  `json:"streamerId"`
+	StreamerID string  `json:"streamerId"`
 }
 
 func NewStreaming(node peer.Peer, log *zerolog.Logger) streaming {
@@ -79,15 +78,11 @@ func (s streaming) AnnounceStream() http.HandlerFunc {
 				}
 			}
 
-			streamId, err := s.node.AnnounceStartStreaming(res.Name, res.Price, image)
+			streamID, err := s.node.AnnounceStartStreaming(res.Name, res.Price, image)
 			if err != nil {
 				http.Error(w, "error announcing stream", http.StatusInternalServerError)
-				fmt.Print("erro announce: %s", err.Error())
-			} else {
-				fmt.Println("announced streaming")
 			}
-			fmt.Print("Ovde")
-			w.Write([]byte("\"" + streamId + "\""))
+			w.Write([]byte("\"" + streamID + "\""))
 		case http.MethodOptions:
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Headers", "*")
@@ -126,7 +121,7 @@ func (s streaming) StartStream() http.HandlerFunc {
 				}
 			}
 
-			go s.node.StreamFFMPG4(res.ManifestName, res.Dir, res.Name, res.Price, res.StreamId, image)
+			go s.node.StreamFFMPG4(res.ManifestName, res.Dir, res.Name, res.Price, res.StreamID, image)
 		case http.MethodOptions:
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Headers", "*")
@@ -141,10 +136,9 @@ func (s streaming) StopStream() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			streamId := r.URL.Query().Get("streamId")
-			err := s.node.AnnounceStopStreaming(streamId)
+			streamID := r.URL.Query().Get("streamId")
+			err := s.node.AnnounceStopStreaming(streamID)
 			if err != nil {
-				fmt.Println(err.Error())
 				http.Error(w, "error stopping stream", http.StatusInternalServerError)
 			}
 		case http.MethodOptions:
@@ -161,17 +155,15 @@ func (s streaming) ConnectToStream() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			streamId := r.URL.Query().Get("streamId")
-			streamerId := r.URL.Query().Get("streamerId")
-			err := s.node.ConnectToStream(streamId, streamerId)
+			streamID := r.URL.Query().Get("streamId")
+			streamerID := r.URL.Query().Get("streamerId")
+			err := s.node.ConnectToStream(streamID, streamerID)
 			if err != nil {
-				fmt.Printf("%v\n", err.Error())
 				http.Error(w, "error connecting To stream", http.StatusInternalServerError)
 			}
-			CreateFFMPG4Header(streamId, VideoPath)
-			err = s.node.ReceiveFFMPG4(streamId, VideoPath)
+			CreateFFMPG4Header(streamID, VideoPath)
+			err = s.node.ReceiveFFMPG4(streamID, VideoPath)
 			if err != nil {
-				fmt.Printf("%v\n", err.Error())
 				http.Error(w, "error listening To stream", http.StatusInternalServerError)
 			}
 		case http.MethodOptions:
@@ -186,7 +178,7 @@ func (s streaming) ConnectToStream() http.HandlerFunc {
 func CreateFFMPG4Header(streamID string, dir string) {
 	metafileHeader := "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:13\n#EXT-X-MEDIA-SEQUENCE:0\n"
 	errWrite := os.WriteFile(dir+"/"+streamID+".m3u8", []byte(metafileHeader), 0666)
-	fmt.Println("Created metafile: " + dir + "/" + streamID + ".m3u8")
+	log.Info().Msgf("Created metafile: " + dir + "/" + streamID + ".m3u8")
 	if errWrite != nil {
 		log.Error().Msgf(
 			"Error while creating metafile for %s : %s",
@@ -201,8 +193,8 @@ func (s streaming) ReceiveStream() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			streamId := r.URL.Query().Get("StreamId")
-			err := s.node.ReceiveFFMPG4(streamId, VideoPath)
+			streamID := r.URL.Query().Get("StreamId")
+			err := s.node.ReceiveFFMPG4(streamID, VideoPath)
 			if err != nil {
 				http.Error(w, "failed receiving stream", http.StatusBadRequest)
 			}
@@ -223,16 +215,16 @@ func (s streaming) GetStreams() http.HandlerFunc {
 			streamInfos := s.node.GetAllStreams()
 			streams := make([]Stream, 0)
 			for _, streamInfo := range streamInfos {
-				fmt.Println("StreamerId: " + streamInfo.StreamerID)
+				log.Info().Msgf("StreamerId: " + streamInfo.StreamerID)
 				streams = append(
 					streams, Stream{
-						StreamId:   streamInfo.StreamID,
+						StreamID:   streamInfo.StreamID,
 						Name:       streamInfo.Name,
 						Price:      streamInfo.Price,
 						Grade:      streamInfo.Grade,
 						Viewers:    streamInfo.CurrentlyWatching,
 						Image:      base64.StdEncoding.EncodeToString(streamInfo.Thumbnail),
-						StreamerId: streamInfo.StreamerID,
+						StreamerID: streamInfo.StreamerID,
 					},
 				)
 			}
@@ -255,8 +247,8 @@ func (s streaming) GetStreams() http.HandlerFunc {
 }
 
 type ReactToStreamBody struct {
-	StreamId   string  `json:"streamId"`
-	StreamerId string  `json:"streamerId"`
+	StreamID   string  `json:"streamId"`
+	StreamerID string  `json:"streamerId"`
 	Grade      float64 `json:"grade"`
 }
 
@@ -279,7 +271,7 @@ func (s streaming) ReactToStream() http.HandlerFunc {
 				)
 				return
 			}
-			err = s.node.ReactToStream(res.StreamId, res.StreamerId, res.Grade)
+			err = s.node.ReactToStream(res.StreamID, res.StreamerID, res.Grade)
 			if err != nil {
 				http.Error(w, "failed to react to stream: "+err.Error(), http.StatusInternalServerError)
 				return

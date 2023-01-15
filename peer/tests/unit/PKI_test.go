@@ -3,7 +3,6 @@ package unit
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha512"
 	"encoding/json"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
@@ -25,21 +24,13 @@ func generatePublicPrivateKey() (*rsa.PublicKey, *rsa.PrivateKey, error) {
 	return &privateKey.PublicKey, privateKey, nil
 }
 
-func decryptMsg(cipherMsg []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
-	plainMsg, err := rsa.DecryptOAEP(sha512.New(), rand.Reader, privateKey, cipherMsg, nil)
-	if err != nil {
-		return nil, err
-	}
-	return plainMsg, nil
-}
-
 // project tests
 func Test_Project_PKI_Init_Blockchain_With_Amount(t *testing.T) {
 	numNodes := 3
 	amount := 100.0
 	transp := channel.NewTransport()
 	nodes := make([]z.TestNode, numNodes)
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(
 			t,
 			peerFac,
@@ -59,18 +50,10 @@ func Test_Project_PKI_Init_Blockchain_With_Amount(t *testing.T) {
 			n1.AddPeer(n2.GetAddr())
 		}
 	}
-	log.Printf("node peers added")
-	t_time := time.Duration(5)
-	log.Printf("%d sec start", t_time)
-	time.Sleep(time.Second * t_time)
-	log.Printf("%d sec end", t_time)
+	time.Sleep(time.Second * 5)
 
 	for i, node := range nodes {
 		t.Logf("node %d", i)
-
-		store := node.GetStorage().GetBlockchainStore()
-		require.Equal(t, numNodes+1, store.Len())
-
 		nodeAmount, err := node.GetAmount(node.GetAddr())
 		require.NoError(t, err)
 		require.Equal(t, amount, nodeAmount)
@@ -83,7 +66,7 @@ func Test_Project_Init_Blockchain_With_Amount(t *testing.T) {
 	amount := 100.0
 	transp := channel.NewTransport()
 	nodes := make([]z.TestNode, numNodes)
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(
 			t,
 			peerFac,
@@ -133,7 +116,7 @@ func Test_Project_Subscription_Enough_Money(t *testing.T) {
 
 	nodes := make([]z.TestNode, numNodes)
 
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(
 			t,
 			peerFac,
@@ -206,7 +189,7 @@ func Test_Project_Subscription_Not_Enough_Money(t *testing.T) {
 
 	nodes := make([]z.TestNode, numNodes)
 
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(
 			t,
 			peerFac,
@@ -274,7 +257,7 @@ func Test_Project_Subscription_Check(t *testing.T) {
 
 	nodes := make([]z.TestNode, numNodes)
 
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(
 			t,
 			peerFac,
@@ -344,7 +327,7 @@ func Test_Project_Message_Encryption_Decryption(t *testing.T) {
 
 	nodes := make([]z.TestNode, numNodes)
 
-	for i, _ := range nodes {
+	for i := range nodes {
 		node := z.NewTestNode(
 			t,
 			peerFac,

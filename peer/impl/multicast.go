@@ -52,7 +52,7 @@ func (s *MulticastInfo) GetMulticastClients(streamID string) ([]string, error) {
 	return multicastClients, nil
 }
 
-func (s *MulticastInfo) removeMulticastClient(streamID string, client string) error {
+func (s *MulticastInfo) RemoveMulticastClient(streamID string, client string) error {
 	// Acquire lock
 	s.multicastMutex.Lock()
 	defer s.multicastMutex.Unlock()
@@ -202,28 +202,33 @@ func (n *node) multicastJoinMessageCallback(msg types.Message, pkt transport.Pac
 	}
 
 	if multicastJoinMsg.StreamerID != n.conf.Socket.GetAddress() {
-		nextHop := n.getNextHop(multicastJoinMsg.StreamerID)
-		if nextHop != "" {
-			transportMsg, errC := n.conf.MessageRegistry.MarshalMessage(multicastJoinMsg)
-			if errC != nil {
-				return err
-			}
-			errUnicast := n.Unicast(nextHop, transportMsg)
-			if errUnicast != nil {
-				return errUnicast
-			}
-		}
-	} else {
-		pkt = pkt.Copy()
-		pkt.Msg = multicastJoinMsg.Message
-		errPr := n.conf.MessageRegistry.ProcessPacket(pkt)
-		if errPr != nil {
-			log.Error().Msgf("[%s] multicastJoinMessageCallback: Error in processing inner msg: %s",
-				n.conf.Socket.GetAddress(), errPr.Error())
-		}
+		return n.relayMulticastMessage(*multicastJoinMsg)
+	}
+	n.handleMulticastJoinMessageLocally(*multicastJoinMsg, pkt)
+	return nil
+}
 
+func (n *node) relayMulticastMessage(multicastJoinMsg types.MulticastJoinMessage) error {
+	nextHop := n.getNextHop(multicastJoinMsg.StreamerID)
+	if nextHop != "" {
+		transportMsg, errC := n.conf.MessageRegistry.MarshalMessage(multicastJoinMsg)
+		if errC != nil {
+			return errC
+		}
+		errUnicast := n.Unicast(nextHop, transportMsg)
+		return errUnicast
 	}
 	return nil
+}
+
+func (n *node) handleMulticastJoinMessageLocally(multicastJoinMsg types.MulticastJoinMessage, pkt transport.Packet) {
+	pkt = pkt.Copy()
+	pkt.Msg = multicastJoinMsg.Message
+	errPr := n.conf.MessageRegistry.ProcessPacket(pkt)
+	if errPr != nil {
+		log.Error().Msgf("[%s] multicastJoinMessageCallback: Error in processing inner msg: %s",
+			n.conf.Socket.GetAddress(), errPr.Error())
+	}
 }
 
 // MulticastInit initializes multicast
